@@ -126,3 +126,65 @@ DATABASES = {
     },
 }
 ```
+
+# 快速入门
+
+前置准备：
+* 已经安装好蓝鲸智云的PaaS平台
+* 在本地hosts文件加入如下配置: 127.0.0.1 dev.weops.com
+
+在WeOps Framework框架中完成API开发：
+
+1、新建文件夹`apps_other`/`app_test`
+2、新建`config.py`
+```
+app_name = "apps_other.app_test"
+```
+3、新建`urls.py`
+```
+from rest_framework.routers import DefaultRouter
+from . import views
+
+router = DefaultRouter()
+router.register(r'', views.HelloViewSet, "hello")
+
+urlpatterns = router.urls
+```
+
+4、新建`views.py`
+```
+from rest_framework.routers import DefaultRouter
+
+from apps_other.app_test import views
+
+router = DefaultRouter()
+router.register(r'', views.HelloViewSet, "hello")
+
+urlpatterns = router.urls
+```
+
+5、在根目录下新建`local_settings.py`
+```
+APP_ID="<SaaS的APP ID>"
+APP_TOKEN="<SaaS的Token>"
+RUN_VER="open"
+BK_URL="<蓝鲸PaaS平台的地址>"
+BK_PAAS_HOST="<蓝鲸PaaS平台的地址>"
+BK_PAAS_INNER_HOST="<蓝鲸PaaS平台的地址>"
+
+BROKER_URL='<RabbitMQ的地址>'
+
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": "",  # noqa
+        "USER": "root",
+        "PASSWORD": "",
+        "HOST": "",
+        "PORT": "3306",
+        # 单元测试 DB 配置，建议不改动
+        "TEST": {"NAME": "test_db", "CHARSET": "utf8", "COLLATION": "utf8_general_ci"},
+    },
+}
+```
+6、访问`http://dev.weops.com:8000/docs/` 就可以看到刚才加入的API了
