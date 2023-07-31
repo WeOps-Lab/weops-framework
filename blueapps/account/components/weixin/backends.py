@@ -46,7 +46,7 @@ class WeixinBackend(ModelBackend):
             if user:
                 return user
         if not code:
-            return None
+            return 0
 
         # result, user_info = self.verify_weixin_code(code)
         result, user_info = self.get_weixin_user(code)
