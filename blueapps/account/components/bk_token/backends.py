@@ -27,6 +27,16 @@ logger = logging.getLogger("component")
 
 ROLE_TYPE_ADMIN = "1"
 
+class LoginBackend(ModelBackend):
+    def authenticate(self, request, username=None, password=None, **kwargs):
+        logger.debug(u"Enter in TokenBackend")
+        user_model = get_user_model()
+        try:
+            user = user_model.objects.get(username=username)
+        except Exception as e:
+            return None
+        if user.check_password(password):
+            return user
 
 class TokenBackend(ModelBackend):
     def authenticate(self, request=None, bk_token=None):
