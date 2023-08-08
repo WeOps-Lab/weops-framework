@@ -17,7 +17,12 @@ from django.conf import settings
 
 class ConfFixture(object):
     BACKEND_TYPE = "bk_token"
-    USER_BACKEND = "bk_token.backends.TokenBackend"
+    if settings.DEBUG:
+        #如果是本地登录，使用当前LoginBackend
+        USER_BACKEND = 'bk_token.backends.LoginBackend'
+    else:
+        #如果是蓝鲸登录，使用TokenBackend
+        USER_BACKEND = 'bk_token.backends.TokenBackend'
     LOGIN_REQUIRED_MIDDLEWARE = "bk_token.middlewares.LoginRequiredMiddleware"
     USER_MODEL = "bk_token.models.UserProxy"
 
