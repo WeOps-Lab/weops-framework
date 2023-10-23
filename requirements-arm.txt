@@ -1,0 +1,78 @@
+# -*- coding: utf-8 -*-
+# 工程预装模块
+# 需要额外的python包，可直接在文件后面添加
+# 请确保指定的包和版本号，可通过pip安装
+
+# blueapps requirement
+Django==2.2.6
+mysqlclient==1.4.4
+MarkupSafe==1.1.1
+requests==2.27.1
+celery==3.1.25
+django-celery==3.2.1
+python-json-logger==0.1.7
+whitenoise==3.3.0
+six==1.11.0
+django-cors-middleware==1.5.0
+django-cors-headers==3.2.1
+croniter==1.2.0
+
+# drf requirement
+djangorestframework==3.11.1
+django-rest-swagger==2.2.0
+django-filter==2.3.0
+
+#Extra
+Pillow==6.0.0
+django-mysql==3.8.1
+pymongo==3.7.2
+django-redis==4.8.0
+redis==3.5.3
+Werkzeug==0.15.3
+
+
+python-dateutil==2.8.1
+wechatpy==1.8.13
+pycryptodome==3.9.8
+
+# for Excel
+openpyxl==3.0.5
+XlsxWriter==3.0.1
+urllib3==1.25.11
+
+# 全文检索
+django-haystack==3.1.1
+drf-haystack==1.8.11
+jieba_fast==0.53
+Whoosh==2.7.4
+
+# minio
+filetype==1.0.13
+minio==7.1.7
+django-minio-backend==3.3.2
+
+numpy==1.19.5
+PyMySQL==1.0.2
+
+casbin==1.16.8
+casbin-django-orm-adapter==0.0.1
+
+# uWSGI==2.0.20
+# uwsgidecorators==1.1.0
+
+# 补丁
+typing-extensions==3.7.4.3
+hvac==1.0.2
+pycryptodome==3.9.8
+setuptools==56.0.0
+wheel==0.37.1
+
+# weopsproxy
+# weopsproxy==1.0.2
+
+PyYAML==6.0
+wrapt==1.14.1
+django-versionlog==1.6.0
+opentelemetry-distro==0.33b0
+
+wheel==0.37.0
