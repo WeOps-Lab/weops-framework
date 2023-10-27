@@ -71,7 +71,6 @@ from blueapps.account.decorators import login_exempt
 from blueking.component.shortcuts import get_client_by_user
 from apps.system_mgmt.common_utils.bk_api_utils.main import ApiManager
 from apps.system_mgmt.common_utils.casbin_inst_service import CasBinInstService
-from apps.system_mgmt.common_utils.weops_proxy import get_access_point
 from apps.system_mgmt.constants import USER_CACHE_KEY
 from packages.drf.viewsets import ModelViewSet
 from utils.app_log import logger
@@ -1093,17 +1092,6 @@ class InstancesPermissionsModelViewSet(ModelViewSet):
                 result.update(dict(status=500, data={"success": False, "detail": "删除失败！请联系管理员"}))
 
         return Response(**result)
-
-
-@require_GET
-def access_points(request):
-    """
-    查询接入点
-    写在基础设置里
-    允许所有的app调用
-    """
-    result = {"result": True, "message": "", "data": get_access_point()}
-    return JsonResponse(result)
 
 
 @login_exempt
