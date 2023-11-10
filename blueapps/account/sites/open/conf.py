@@ -25,8 +25,8 @@ class ConfFixture(object):
         USER_BACKEND = 'bk_token.backends.TokenBackend'
         LOGIN_REQUIRED_MIDDLEWARE = "bk_token.middlewares.LoginRequiredMiddleware"
     else:
-        USER_BACKEND = ''
-        LOGIN_REQUIRED_MIDDLEWARE = ""
+        USER_BACKEND = 'bk_keycloak.backends.KeycloakBackend'
+        LOGIN_REQUIRED_MIDDLEWARE = "bk_keycloak.middlewares.KeycloakMiddleware"
 
     USER_MODEL = "bk_token.models.UserProxy"
 

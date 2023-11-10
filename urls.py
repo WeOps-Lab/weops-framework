@@ -29,7 +29,7 @@ from apps.system_mgmt.views import (
     SysSettingViewSet,
     SysUserViewSet,
     UserManageViewSet,
-    login_info,
+    login_info, KeyCloakLoginView, KeyCloakViewSet,
 )
 
 urlpatterns = [
@@ -82,15 +82,26 @@ urlpatterns += [
     # 系统管理
     url(r"^system/mgmt/", include("apps.system_mgmt.urls")),
     url(r"^login_info/$", login_info),
+    url(r"^keycloak_login/$", KeyCloakLoginView.as_view(), name='keycloak_login'),
 
 ]
 
 urlpatterns += [url(r"^docs/$", schema_view)]
 
+try:
+    from custom_urls import urlpatterns as custom_url
+    urlpatterns += custom_url
+
+except ImportError as e:
+    traceback.print_exc()  # 打印详细的错误信息
+    pass
+
 # 添加视图集路由
 router = SimpleRouter()
 
 # 3.5版本用户管理
+
+router.register(r"system/mgmt/user_keycloak", KeyCloakViewSet, basename="keycloak-user")
 
 router.register(r"system/mgmt/user_manage", UserManageViewSet, basename="sys-user")
 

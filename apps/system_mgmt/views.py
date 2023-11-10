@@ -12,12 +12,14 @@ specific language governing permissions and limitations under the License.
 """
 import hashlib
 import json
+import logging
 import os
 import random
 import re
 import string
 import time
 
+import requests
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Q, QuerySet
@@ -25,6 +27,8 @@ from django.db.transaction import atomic
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
+from drf_yasg import openapi
+from drf_yasg.utils import swagger_auto_schema
 
 # 开发框架中通过中间件默认是需要登录态的，如有不需要登录的，可添加装饰器login_exempt
 # 装饰器引入 from blueapps.account.decorators import login_exempt
@@ -32,6 +36,7 @@ from rest_framework.decorators import action
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 from django.apps import apps
 from apps.system_mgmt import constants as system_constants
@@ -58,7 +63,7 @@ from apps.system_mgmt.serializers import (
 )
 from apps.system_mgmt.user_manages import UserManageApi
 from apps.system_mgmt.utils import UserUtils
-from apps.system_mgmt.utils_package.controller import RoleController, UserController
+from apps.system_mgmt.utils_package.controller import RoleController, UserController, KeyCloakUserController
 from apps.system_mgmt.utils_package.inst_permissions import InstPermissionsUtils
 from blueapps.account.components.weixin.weixin_utils import WechatUtils
 from blueapps.account.decorators import login_exempt
@@ -66,6 +71,7 @@ from blueapps.account.decorators import login_exempt
 from blueking.component.shortcuts import get_client_by_user
 from apps.system_mgmt.common_utils.bk_api_utils.main import ApiManager
 from apps.system_mgmt.common_utils.casbin_inst_service import CasBinInstService
+from apps.system_mgmt.common_utils.weops_proxy import get_access_point
 from apps.system_mgmt.constants import USER_CACHE_KEY
 from packages.drf.viewsets import ModelViewSet
 from utils.app_log import logger
@@ -364,6 +370,151 @@ class SysSettingViewSet(ModelViewSet):
         }
         signature = WechatUtils.generate_signature(params)
         return Response(data={"appId": wx_app_id, "timestamp": timestamp, "nonceStr": noncestr, "signature": signature})
+
+from rest_framework import viewsets
+from rest_framework import views, status
+from django.contrib.auth import get_user_model
+from rest_framework.authtoken.models import Token
+
+class KeyCloakLoginView(views.APIView):
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'username': openapi.Schema(type=openapi.TYPE_STRING, description='User username'),
+                'password': openapi.Schema(type=openapi.TYPE_STRING, description='User password'),
+            }
+        ),
+    )
+    @login_exempt
+    def post(self, request):
+        # 从请求中获取用户名和密码
+        username = request.data.get('username')
+        password = request.data.get('password')
+
+        # 使用 Keycloak API 验证用户
+        response = self.authenticate_with_keycloak(username, password)
+        user_data = response.json()
+        if user_data:
+            # 检查用户是否在本地数据库中
+            user = get_user_model().objects.filter(username=username).first()
+
+            if not user:
+                # 如果用户不在本地数据库中，创建本地用户
+                user = get_user_model().objects.create(username=username)
+
+            # 返回令牌和成功响应
+            # token, created = Token.objects.get_or_create(user=user)
+            token = response.json().get("access_token")
+
+
+            return Response({'token': token}, status=status.HTTP_200_OK)
+        else:
+            # 用户验证失败，返回错误响应
+            return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    @classmethod
+    def authenticate_with_keycloak(cls, username, password):
+        keycloak_server = settings.KEYCLOAK_SERVER
+        keycloak_port = settings.KEYCLOAK_PORT
+        keycloak_url = f"http://{keycloak_server}:{keycloak_port}/realms/master/protocol/openid-connect/token"
+
+        payload = {
+            "client_id": "security-admin-console",
+            "grant_type": "password",
+            "username": username,
+            "password": password,
+        }
+        response = requests.post(keycloak_url, data=payload)
+
+        if response.status_code == 200:
+            return response
+        else:
+            return None
+class KeyCloakViewSet(viewsets.ViewSet):
+
+    def __init__(self, *args, **kwargs):
+        super(KeyCloakViewSet, self).__init__(*args, **kwargs)
+    @transaction.atomic
+    @action(methods=["GET"], detail=False, url_path="get_users")
+    @ApiLog("用户管理获取用户")
+    def get_cloak_user_manage(self, request):
+        page = int(request.query_params.get("page", 1))  # 获取请求中的页码参数，默认为第一页
+        per_page = int(request.query_params.get("per_page", 10))  # 获取请求中的每页结果数，默认为10
+        bk_token = request.COOKIES.get('bk_token', None)
+        res = KeyCloakUserController.get_user_list(**{"page": page,"per_page":per_page,"bk_token":bk_token})
+        return Response(res)
+
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'username': openapi.Schema(type=openapi.TYPE_STRING, description='User username'),
+                'email': openapi.Schema(type=openapi.TYPE_STRING, description='User email'),
+                'lastName': openapi.Schema(type=openapi.TYPE_STRING, description='User last name'),
+                'password': openapi.Schema(type=openapi.TYPE_STRING, description='User password'),
+            }
+        ),
+    )
+    @transaction.atomic
+    @action(methods=["POST"], detail=False, url_path="create_user")
+    @ApiLog("用户管理创建用户")
+    def create_keycloak_user_manage(self, request, *args, **kwargs):
+        res = KeyCloakUserController.create_user(**{"request": request})
+        return Response(res)
+
+    @transaction.atomic
+    @action(methods=["DELETE"], detail=False, url_path="delete_users")
+    @ApiLog("用户管理删除用户")
+    def delete_keycloak_user_manage(self, request, *args, **kwargs):
+        """
+        删除用户
+        """
+        res = KeyCloakUserController.delete_user(**{"request":request})
+        return Response(res)
+
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'id': openapi.Schema(type=openapi.TYPE_STRING, description='User id'),
+                'email': openapi.Schema(type=openapi.TYPE_STRING, description='User email'),
+                'firstName': openapi.Schema(type=openapi.TYPE_STRING, description='User first name'),
+                'lastName': openapi.Schema(type=openapi.TYPE_STRING, description='User last name'),
+            }
+        ),
+    )
+    @transaction.atomic
+    @action(methods=["PUT"], detail=False, url_path="update_user")
+    @ApiLog("用户管理修改用户信息")
+    def update_bk_user(self, request):
+        """
+        修改用户信息
+        """
+        res = KeyCloakUserController.update_user(**{"request": request})
+        return Response(res)
+
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'id': openapi.Schema(type=openapi.TYPE_STRING, description='User id'),
+                'password': openapi.Schema(type=openapi.TYPE_STRING, description='User password'),
+            }
+        ),
+    )
+    @transaction.atomic
+    @action(methods=["PUT"], detail=False, url_path="reset_password")
+    @ApiLog("用户管理重置密码")
+    def reset_user_password(self, request):
+        """
+        重置用户密码
+        """
+        id = request.data.get("id")
+        password = request.data.get("password")
+        bk_token = request.COOKIES.get('bk_token', None)
+        res = KeyCloakUserController.reset_password(**{"id":id,"password":password,"bk_token":bk_token})
+        return Response(res)
 
 
 class UserManageViewSet(ModelViewSet):
@@ -944,6 +1095,17 @@ class InstancesPermissionsModelViewSet(ModelViewSet):
         return Response(**result)
 
 
+@require_GET
+def access_points(request):
+    """
+    查询接入点
+    写在基础设置里
+    允许所有的app调用
+    """
+    result = {"result": True, "message": "", "data": get_access_point()}
+    return JsonResponse(result)
+
+
 @login_exempt
 def get_is_need_two_factor(request):
     user = request.GET["user"]
@@ -1014,6 +1176,8 @@ def generate_validate_code():
     md5_client = hashlib.md5()
     md5_client.update(code.encode("utf8"))
     return code, md5_client.hexdigest()
+
+
 @require_GET
 def login_info(request):
     pattern = re.compile(r"weops_saas[-_]+[vV]?([\d.]*)")

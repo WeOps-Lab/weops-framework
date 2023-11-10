@@ -83,12 +83,14 @@ conda create --name auto-mate python=3.6
 conda activate venv
 # 安装环境所需pip包
 pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
+#拉起本地环境
+cd docker
+docker-compose up
 # 安装pre-commit
 pip install pre-commit
 pre-commit install --allow-missing-config
 pre-commit install --hook-type commit-msg --allow-missing-config
 ```
-
 
 #### 正式开发
 1、在`apps_other`目录下新建python包，包名必须以`app_` 开头
@@ -135,6 +137,7 @@ APP_ID=WEOPS
 APP_TOKEN=123456
 ```
 
+
 7、注意事项
 开发过程中不要修改除apps_other目录外的其它文件
 本地开发时，可以在根目录新建local_settings.py文件，并将database相关的配置信息写在里面
@@ -153,6 +156,7 @@ DATABASES = {
 }
 ```
 
+
 #### 登录功能
 
 ##### 登录方式
@@ -160,6 +164,7 @@ DATABASES = {
 登录方式分为基于蓝鲸平台认证登录、基于本地mysql数据库用户验证登录、其他登录方式
 基于蓝鲸平台认证登录时，开发环境为blueking
 基于本地mysql认证登录时，开发环境为local
+基于keycloak认证登录时，开发环境为keycloak
 需进行不同平台认证开发时，将环境变量调换即可
 ![envs.json](./docs/img/env_login.png)
 
@@ -184,13 +189,29 @@ DATABASES = {
 在`blueapps/account/sites/open`目录下的`conf.py`文件中注册`backend`及`middleware`
 ![conf.py](./docs/img/login_register.png)
 
-6、设置环境变量
-通过判断不同的环境变量，用户进行不同方式的登录,在目录`config/`中修改`envs.json`,从而设置多种环境变量
+6、注释环境变量
+通过判断不同的环境变量，用户进行不同方式的登录,在目录`config/`中修改`envs.json`,从而注释多种环境变量
 ![envs.json](./docs/img/env_login.png)
 
 7、配置环境变量及修改重定向
 在目录`config/`中修改`default.py`文件中的缓存，配置环境变量，及修改用户登录的重定向（Django自带用户登录窗口，开发时可根据需要，是否修改重定向）
 ![default.py](./docs/img/config_default.png)
+
+### 注意事项
+使用keycloak作为开发时，需要打开direct直连以及修改token认证时间
+在浏览器地址栏输入keycloak的客户端地址  localhost:8080
+![img.png](img.png)
+
+账号：admin，密码：admin，通过UI界面进入到keycloak的客户端，然后更改直连、token过期时间、IP访问限制
+
+直连的作用为在pycharm开发时，可以通过接口进行keycloak的访问
+这支持直接访问授权，这意味着客户端可以访问用户的用户名/密码，并直接与 Keycloak 服务器交换访问令牌。根据 OAuth2 规范，这可以支持该客户端的“资源所有者密码凭证授予”。
+![direct1.png](./docs/img/direct1.png)
+![direct2.png](./docs/img/direct2.png)
+
+调整token 的过期时间
+![img_1.png](img_1.png)
+
 
 #### swagger文档
 
@@ -208,6 +229,14 @@ API测试地址：http://127.0.0.1:8000/swagger/
 
 注意：默认只有本地开发时启动swagger
 
+#### 开发app自动注入
+1、开发app完成之后，将该应用注入到系统管理中，进行权限管理。注入方式为根据配置文件进行自动注入
+在该app下创建一个新的文件  `inst_permission_conf.py`，用以配置应用中需要管理的模型以及序列化器等参数，样例如下：
+![inst_permission_conf.py](./docs/img/inst.png)
+2、自动初始化casbin-mesh
+在程序运行时，如果旧的casbin-mesh容器被关闭，新的casbin-mesh容器被打开，这时容器中不存在旧casbin-mesh的数据，因此需要将数据进行同步
+在上图中，参数 'search_inst_list'为设置初始化所必须的参数
+
 #### 注意
 1、测试Swagger接口时，无数据输入界面：
 调整根目录下`urls.py`文件，修改`schema_view = get_schema_view`,确保get_schema_view引用正确，同时检查`drf_yasg`版本
@@ -219,6 +248,3 @@ API测试地址：http://127.0.0.1:8000/swagger/
 3、在管理员登陆界面进行登录之后，跳转到`127.0.0.1:8001/admin/accounts/profile`,而不是管理员管理界面
 django自带管理员登录界面，在实际开发中，如有需要重新进行设计，可遇到此问题，原因在于django默认一个跳转路线，在开发时，可根据5.7，重新设计重定向
 ![](./docs/img/login_to_profile.png)
-
-
-
