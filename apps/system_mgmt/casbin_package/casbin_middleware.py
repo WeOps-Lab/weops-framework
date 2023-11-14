@@ -14,6 +14,8 @@ from apps.system_mgmt.models import SysRole, SysUser
 from apps.system_mgmt.common_utils.casbin_mesh_common import CasbinMeshApiServer
 from apps.system_mgmt.common_utils.casbin_register_policy import MATCH_PASS_PATH, PASS_PATH
 from utils.app_log import logger
+from django.conf import settings
+from blueapps.account import get_user_model
 
 
 class CasbinRBACMiddleware(MiddlewareMixin):
@@ -24,9 +26,12 @@ class CasbinRBACMiddleware(MiddlewareMixin):
 
     @staticmethod
     def super(user):
-        if not SysRole.objects.filter(sysuser__bk_username=user).exists():
-            return
-        return SysRole.objects.filter(sysuser__bk_username=user, role_name=DB_SUPER_USER).exists()
+        if settings.LOGIN_METHOD == "local":
+            return get_user_model().objects.get(username=user).is_superuser
+        else:
+            if not SysRole.objects.filter(sysuser__bk_username=user).exists():
+                return
+            return SysRole.objects.filter(sysuser__bk_username=user, role_name=DB_SUPER_USER).exists()
 
     @staticmethod
     def super_role(user):
