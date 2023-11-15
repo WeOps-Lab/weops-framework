@@ -30,13 +30,10 @@ cache = caches["login_db"]
 
 class LocalLoginRequiredMiddleware(MiddlewareMixin):
     def process_view(self, request, view, args, kwargs):
-        #验证当前的url
-        current_page_url = request.get_full_path()
         #验证当前用户是否登录
         current_user = request.user
-        if current_user.is_staff is False:
-            if 'admin' not in current_page_url:
-                return HttpResponseRedirect(reverse('admin:index'))
+        if current_user.is_staff is False and request.path != reverse('admin:login'):
+            return HttpResponseRedirect(reverse('admin:login'))
 
         if request.method == 'POST':
             username = request.POST.get('username')

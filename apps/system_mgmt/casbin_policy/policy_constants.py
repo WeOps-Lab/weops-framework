@@ -50,6 +50,7 @@ PASS_PATH = {
     ("/", "GET"),
     ("/mobile/", "GET"),
     ("/mobile/login/user/info/", "GET"),
+    ("/admin/login/", "GET"),
     # 回调函数
     ("/operational_tools/job_call_back/", "POST"),
     ("/auto_mate/auto_mate_exec_ansible_call_back/", "POST"),
