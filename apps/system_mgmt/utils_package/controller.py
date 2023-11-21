@@ -12,6 +12,7 @@ import requests
 from casbin_adapter.models import CasbinRule
 from django.conf import settings
 from django.db import transaction
+from keycloak import KeycloakAdmin, KeycloakOpenIDConnection
 
 # from apps.monitor_mgmt.models import CloudPlatGroup
 from apps.system_mgmt.celery_tasks import (
@@ -143,7 +144,8 @@ class UserController(object):
                     operator="admin",
                     operate_type=OperationLog.MODIFY,
                     operate_obj=instance.bk_username,
-                    operate_summary="对外开放接口调用，修改用户角色，角色名称：[{}]".format(",".join(i for i in roles_names)),
+                    operate_summary="对外开放接口调用，修改用户角色，角色名称：[{}]".format(
+                        ",".join(i for i in roles_names)),
                     current_ip="127.0.0.1",
                     app_module="系统管理",
                     obj_type="角色管理",
@@ -390,8 +392,6 @@ class UserController(object):
         # casbin_mesh 删除用户
         transaction.on_commit(lambda: sync_casbin_mesh_remove_policies(sec="g", ptype="g", rules=rules))
 
-
-
         return {"data": "删除用户成功！"}
 
     @classmethod
@@ -472,7 +472,6 @@ class UserController(object):
             )
         )
 
-
         return {"data": "设置用户角色成功！"}
 
     @classmethod
@@ -502,7 +501,8 @@ class UserController(object):
                     operator=request.user.username,
                     operate_type=OperationLog.MODIFY,
                     operate_obj=instance.bk_username,
-                    operate_summary="修改用户【{}】状态为【{}】".format(instance.bk_username, instance.get_status_display()),
+                    operate_summary="修改用户【{}】状态为【{}】".format(instance.bk_username,
+                                                                    instance.get_status_display()),
                     current_ip=current_ip,
                     app_module="系统管理",
                     obj_type="用户管理",
@@ -580,8 +580,6 @@ class RoleController(object):
                 app_module="系统管理",
                 obj_type="角色管理",
             )
-
-
 
         return {"data": "修改角色成功！"}
 
@@ -852,10 +850,25 @@ class RoleController(object):
     def open_set_casbin_mesh(cls):
         return CasbinUtils.casbin_change_workflow()
 
-class KeyCloakUserController(object):
 
+class KeyCloakUserController(object):
     keycloak_server = settings.KEYCLOAK_SERVER
     keycloak_port = settings.KEYCLOAK_PORT
+
+    @classmethod
+    def get_keycloak_admin(cls, token: str) -> KeycloakAdmin:
+        keycloak_connection = KeycloakOpenIDConnection(
+            server_url=f'http://{settings.KEYCLOAK_SETTINGS["KEYCLOAK_SERVER"]}:{settings.KEYCLOAK_SETTINGS["KEYCLOAK_PORT"]}/',
+            realm_name=f'{settings.KEYCLOAK_SETTINGS["REALM_NAME"]}',
+            client_id=f'{settings.KEYCLOAK_SETTINGS["CLIENT_ID"]}',
+            client_secret_key=f'{settings.KEYCLOAK_SETTINGS["CLIENT_SECRET_KEY"]}',
+            custom_headers={
+                "Authorization": f"Bearer {token}"
+            },
+            verify=True)
+        keycloak_admin = KeycloakAdmin(connection=keycloak_connection)
+        return keycloak_admin
+
     @classmethod
     def retrieve_access_token(cls):
         url = f"http://{cls.keycloak_server}:{cls.keycloak_port}/realms/master/protocol/openid-connect/token"
@@ -875,153 +888,181 @@ class KeyCloakUserController(object):
             return None
 
     @classmethod
-    def create_user(cls, **kwargs):
-        # 构建创建用户的URL
-        url = f"http://{cls.keycloak_server}:{cls.keycloak_port}/admin/realms/master/users"
-        request = kwargs["request"]
-        bk_token = request.COOKIES.get('bk_token', None)
-        # 添加访问令牌到请求头
-        headers = {
-            "Authorization": f"Bearer {bk_token}",
-            "Content-Type": "application/json"
-        }
-        request = kwargs["request"]
-        user_data = request.data
-        user_data["enabled"] = True
-        password = user_data.pop("password")
-        # 发送POST请求来创建用户
-        response = requests.post(url, headers=headers, data=json.dumps(user_data))
+    def create_user(cls, user = None, token = None):
+        # # 构建创建用户的URL
+        # url = f"http://{cls.keycloak_server}:{cls.keycloak_port}/admin/realms/master/users"
+        # request = kwargs["request"]
+        # bk_token = request.COOKIES.get('bk_token', None)
+        # # 添加访问令牌到请求头
+        # headers = {
+        #     "Authorization": f"Bearer {bk_token}",
+        #     "Content-Type": "application/json"
+        # }
+        # request = kwargs["request"]
+        # user_data = request.data
+        # user_data["enabled"] = True
+        # password = user_data.pop("password")
+        # # 发送POST请求来创建用户
+        # response = requests.post(url, headers=headers, data=json.dumps(user_data))
+        #
+        # if response.status_code == 201:
+        #     # 用户已成功创建
+        #     # 根据用户名获取id
+        #     user_info_url = f'http://{cls.keycloak_server}:{cls.keycloak_port}/admin/realms/master/users'
+        #     params = {
+        #         "username": user_data.get("username")
+        #     }
+        #     user_info_response = requests.get(user_info_url, headers=headers, params=params)
+        #     if user_info_response.status_code == 200:
+        #         id = user_info_response.json()[0].get("id")
+        #         res = cls.reset_password(**{"id": id, "password": password})
+        #         return {"message": "创建用户成功"}
+        # else:
+        #     # 创建用户失败
+        #     return {"error": "创建失败"}
+        try:
+            cls.get_keycloak_admin(token).create_user(user)
+        except Exception as e:
+            return {'error':str(e)}
+        return {'message':'创建成功'}
 
-        if response.status_code == 201:
-            # 用户已成功创建
-            #根据用户名获取id
-            user_info_url = f'http://{cls.keycloak_server}:{cls.keycloak_port}/admin/realms/master/users'
-            params = {
-                "username": user_data.get("username")
-            }
-            user_info_response = requests.get(user_info_url, headers=headers, params=params)
-            if user_info_response.status_code == 200:
-                id = user_info_response.json()[0].get("id")
-                res = cls.reset_password(**{"id":id,"password":password})
-                return {"message": "创建用户成功"}
-        else:
-            # 创建用户失败
-            return {"error": "创建失败"}
+
+
+
     @classmethod
-    def get_user_list(cls, page=None, per_page=None,bk_token = None):
+    def get_user_list(cls, page=None, per_page=None, search = None, token=None):
         # bk_token = cls.retrieve_access_token()
-        url = f"http://{cls.keycloak_server}:{cls.keycloak_port}/admin/realms/master/users"
-        headers = {
-            "Authorization": f"Bearer {bk_token}"
-        }
+        # url = f"http://{cls.keycloak_server}:{cls.keycloak_port}/admin/realms/master/users"
+        # headers = {
+        #     "Authorization": f"Bearer {bk_token}"
+        # }
+        #
+        # # 请求总用户数
+        # total_users_response = requests.get(url, headers=headers, params={"count": True})
+        # if total_users_response.status_code == 200:
+        #     total_users = total_users_response.json()
+        #     total_count = len(total_users)
+        # else:
+        #     logging.error(f"Failed to retrieve total user count. Status code: {total_users_response.status_code}")
+        #     total_count = 0
 
-        # 请求总用户数
-        total_users_response = requests.get(url, headers=headers, params={"count": True})
-        if total_users_response.status_code == 200:
-            total_users = total_users_response.json()
-            total_count = len(total_users)
-        else:
-            logging.error(f"Failed to retrieve total user count. Status code: {total_users_response.status_code}")
-            total_count = 0
+        # users = cls.get_keycloak_admin(bk_token).get_users({})
+        # # 请求分页用户列表
+        # if page and per_page:
+        #     first = (page - 1) * per_page
+        #     max = per_page
+        #     params = {"first": first, "max": max}
+        #     user_list_response = cls.get_keycloak_admin(bk_token).get_users(params)
+        #     if user_list_response.status_code == 200:
+        #         users = user_list_response.json()
+        #     else:
+        #         logging.error(f"Failed to retrieve user list. Status code: {user_list_response.status_code}")
+        #         users = []
+        # else:
+        #     users = []
 
-        # 请求分页用户列表
-        if page and per_page:
-            first = (page - 1) * per_page
-            max = per_page
-            params = {"first": first, "max": max}
-            user_list_response = requests.get(url, headers=headers, params=params)
-            if user_list_response.status_code == 200:
-                users = user_list_response.json()
-            else:
-                logging.error(f"Failed to retrieve user list. Status code: {user_list_response.status_code}")
-                users = []
-        else:
-            users = []
-
-        return {"count": total_count, "users": users}
-
-    @classmethod
-    def delete_user(cls,**kwargs):
-
-        id = kwargs["request"].query_params.get("id")
-        request = kwargs["request"]
-        bk_token = request.COOKIES.get('bk_token', None)
-        # 构建删除用户的URL
-        url = f"http://{cls.keycloak_server}:{cls.keycloak_port}/admin/realms/master/users/{id}"
-
-        # 添加访问令牌到请求头
-        headers = {
-            "Authorization": f"Bearer {bk_token}"
-        }
-
-        # 发送DELETE请求来删除用户
-        response = requests.delete(url, headers=headers)
-
-        if response.status_code == 204:
-            # 用户已成功删除
-            return {"message": "User deleted successfully"}
-        elif response.status_code == 404:
-            # 用户不存在
-            return {"error": "User not found"}
-        else:
-            # 删除用户失败
-            return {"error": "User deletion failed"}
+        first = (page - 1) * per_page
+        max = per_page
+        params = {"first": first, "max": max, "search":search}
+        users = cls.get_keycloak_admin(token).get_users(params)
+        return {"count": len(users), "users": users}
 
     @classmethod
-    def update_user(cls, **kwargs):
+    def delete_user(cls, user_id : str, token : str):
+        # id = kwargs["request"].query_params.get("id")
+        # request = kwargs["request"]
+        # bk_token = request.COOKIES.get('bk_token', None)
+        # # 构建删除用户的URL
+        # url = f"http://{cls.keycloak_server}:{cls.keycloak_port}/admin/realms/master/users/{id}"
+        #
+        # # 添加访问令牌到请求头
+        # headers = {
+        #     "Authorization": f"Bearer {bk_token}"
+        # }
+        #
+        # # 发送DELETE请求来删除用户
+        # response = requests.delete(url, headers=headers)
+        #
+        # if response.status_code == 204:
+        #     # 用户已成功删除
+        #     return {"message": "User deleted successfully"}
+        # elif response.status_code == 404:
+        #     # 用户不存在
+        #     return {"error": "User not found"}
+        # else:
+        #     # 删除用户失败
+        #     return {"error": "User deletion failed"}
+        try:
+            cls.get_keycloak_admin(token).delete_user(user_id)
+        except Exception as e:
+            return {'error':str(e)}
+        return {'message':'删除成功'}
 
-        request = kwargs["request"]
-        id = request.data.get("id")
-        request = kwargs["request"]
-        bk_token = request.COOKIES.get('bk_token', None)
-        user_data = request.data
-        user_data.pop("id")
-        # 构建修改用户信息的URL
-        url = f"http://{cls.keycloak_server}:{cls.keycloak_port}/admin/realms/master/users/{id}"
-
-        # 添加访问令牌到请求头
-        headers = {
-            "Authorization": f"Bearer {bk_token}",
-            "Content-Type": "application/json"
-        }
-
-        # 发送PUT请求来修改用户信息
-        response = requests.put(url, headers=headers, data=json.dumps(user_data))
-        print(response.status_code)
-        if response.status_code == 204:
-            # 用户信息已成功修改
-            return {"message": "用户信息修改成功"}
-        else:
-            # 修改用户信息失败
-            return {"message": f"用户信息修改失败，{response.text}"}
 
     @classmethod
-    def reset_password(cls, **kwargs):
-        id = kwargs["id"]
-        password = kwargs["password"]
-        bk_token = kwargs["bk_token"]
-        # 构建重置密码的URL
-        url = f"http://{cls.keycloak_server}:{cls.keycloak_port}/admin/realms/master/users/{id}/reset-password"
+    def update_user(cls, user_id:str, payload:dict, token : str):
+        # request = kwargs["request"]
+        # id = request.data.get("id")
+        # request = kwargs["request"]
+        # bk_token = request.COOKIES.get('bk_token', None)
+        # user_data = request.data
+        # user_data.pop("id")
+        # # 构建修改用户信息的URL
+        # url = f"http://{cls.keycloak_server}:{cls.keycloak_port}/admin/realms/master/users/{id}"
+        #
+        # # 添加访问令牌到请求头
+        # headers = {
+        #     "Authorization": f"Bearer {bk_token}",
+        #     "Content-Type": "application/json"
+        # }
+        #
+        # # 发送PUT请求来修改用户信息
+        # response = requests.put(url, headers=headers, data=json.dumps(user_data))
+        # print(response.status_code)
+        # if response.status_code == 204:
+        #     # 用户信息已成功修改
+        #     return {"message": "用户信息修改成功"}
+        # else:
+        #     # 修改用户信息失败
+        #     return {"message": f"用户信息修改失败，{response.text}"}
+        try:
+            cls.get_keycloak_admin(token).update_user(user_id, payload)
+        except Exception as e:
+            return {'error':str(e)}
+        return {'message':'修改成功'}
 
-        # 添加访问令牌到请求头
-        headers = {
-            "Authorization": f"Bearer {bk_token}",
-            "Content-Type": "application/json"
-        }
-
-        # 构建包含新密码的数据
-        data = {
-            "type": "password",
-            "temporary": False,
-            "value": password
-        }
-
-        # 发送PUT请求来重置密码
-        response = requests.put(url, headers=headers, json=data)
-
-        if response.status_code == 204:
-            # 密码已成功重置
-            return {"message": "密码修改成功","status":200}
-        else:
-            # 重置密码失败
-            return {"error": "密码修改失败"}
+    @classmethod
+    def reset_password(cls, user_id: str, password: str, token: str):
+        # id = kwargs["id"]
+        # password = kwargs["password"]
+        # bk_token = kwargs["bk_token"]
+        # # 构建重置密码的URL
+        # url = f"http://{cls.keycloak_server}:{cls.keycloak_port}/admin/realms/master/users/{id}/reset-password"
+        #
+        # # 添加访问令牌到请求头
+        # headers = {
+        #     "Authorization": f"Bearer {bk_token}",
+        #     "Content-Type": "application/json"
+        # }
+        #
+        # # 构建包含新密码的数据
+        # data = {
+        #     "type": "password",
+        #     "temporary": False,
+        #     "value": password
+        # }
+        #
+        # # 发送PUT请求来重置密码
+        # response = requests.put(url, headers=headers, json=data)
+        #
+        # if response.status_code == 204:
+        #     # 密码已成功重置
+        #     return {"message": "密码修改成功", "status": 200}
+        # else:
+        #     # 重置密码失败
+        #     return {"error": "密码修改失败"}
+        try:
+            cls.get_keycloak_admin(token).set_user_password(user_id, password, False)
+        except Exception as e:
+            return {'error':str(e)}
+        return {'message':'修改成功'}

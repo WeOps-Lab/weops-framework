@@ -83,8 +83,18 @@ REDIS_HOST = os.environ.get("BKAPP_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = os.environ.get("BKAPP_REDIS_PORT", "6379")
 REDIS_DB = os.environ.get("BKAPP_REDIS_DB", 0)
 AUTO_MATE_REDIS_DB = os.environ.get("BKAPP_AUTO_MATE_REDIS_DB", 11)
+# 去环境变量寻找登录方式，找不到就用keycloak
 LOGIN_METHOD = os.environ.get("BKAPP_LOGIN_METHOD", "keycloak")
 LOGIN_REDIRECT_URL = '/admin/' if LOGIN_METHOD == "local" else '/keycloak_login/'
+KEYCLOAK_SERVER = 'localhost'
+KEYCLOAK_PORT = '8080'
+KEYCLOAK_SETTINGS = {
+    "KEYCLOAK_SERVER" : "localhost",
+    "KEYCLOAK_PORT" : "8080",
+    "REALM_NAME" : "master",
+    "CLIENT_ID" : "weops_lite",
+    "CLIENT_SECRET_KEY" : "UQym8RIjp4X4hxMxIkL1hOktVU1auDa3",
+}
 
 
 try:
@@ -98,7 +108,7 @@ else:
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
             "COMPRESSOR": "django_redis.compressors.zlib.ZlibCompressor",
-        },
+        }
     }
 
 if "redis" in CACHES:
@@ -260,6 +270,9 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "rest_framework.schemas.coreapi.AutoSchema",
     # "EXCEPTION_HANDLER": "utils.exception_capture.common_exception_handler",
 }
+if LOGIN_METHOD == 'keycloak':
+    REST_FRAMEWORK['DEFAULT_AUTHENTICATION_CLASSES'] = ('apps.system_mgmt.KeycloakTokenAuthentication'
+                                                        '.KeycloakTokenAuthentication',)
 
 HAYSTACK_CONNECTIONS = {
     "default": {

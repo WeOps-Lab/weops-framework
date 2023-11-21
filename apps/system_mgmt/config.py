@@ -2,10 +2,10 @@ import os
 
 app_name = "apps.system_mgmt"
 celery_tasks = ("apps.system_mgmt.celery_tasks",)
-add_middleware = (
-    "apps.system_mgmt.middleware.ApplicationMenusPermission",
-    "apps.system_mgmt.casbin_package.casbin_middleware.CasbinRBACMiddleware",
-)
+# add_middleware = (
+#     "apps.system_mgmt.middleware.ApplicationMenusPermission",
+#     "apps.system_mgmt.casbin_package.casbin_middleware.CasbinRBACMiddleware",
+# )
 
 # 以下是casbin配置
 

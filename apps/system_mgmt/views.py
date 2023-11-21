@@ -25,10 +25,13 @@ from django.db import transaction
 from django.db.models import Q, QuerySet
 from django.db.transaction import atomic
 from django.http import JsonResponse
+from django.http import HttpResponseBadRequest
+from rest_framework.request import Request
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
+from keycloak import KeycloakOpenID, KeycloakOpenIDConnection, KeycloakAdmin
 
 # 开发框架中通过中间件默认是需要登录态的，如有不需要登录的，可添加装饰器login_exempt
 # 装饰器引入 from blueapps.account.decorators import login_exempt
@@ -40,6 +43,8 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 from django.apps import apps
 from apps.system_mgmt import constants as system_constants
+from apps.system_mgmt.KeycloakTokenAuthentication import KeycloakTokenAuthentication
+from apps.system_mgmt.KeycloakIsAutenticated import KeycloakIsAuthenticated
 from apps.system_mgmt.casbin_package.permissions import ManagerPermission, get_user_roles
 from apps.system_mgmt.constants import DB_APPS, DB_MENU_IDS, MENUS_MAPPING
 from apps.system_mgmt.filters import (
@@ -255,7 +260,6 @@ class SysUserViewSet(ModelViewSet):
             obj_type="用户",
         )
 
-
         return Response({})
 
     # @action(methods=["GET"], detail=False, url_path="bizs")
@@ -370,12 +374,27 @@ class SysSettingViewSet(ModelViewSet):
         signature = WechatUtils.generate_signature(params)
         return Response(data={"appId": wx_app_id, "timestamp": timestamp, "nonceStr": noncestr, "signature": signature})
 
+
 from rest_framework import viewsets
 from rest_framework import views, status
 from django.contrib.auth import get_user_model
 from rest_framework.authtoken.models import Token
 
+
 class KeyCloakLoginView(views.APIView):
+    '''
+    该类用作验证登录
+    '''
+    # 让RDF不认证
+    authentication_classes = []
+    permission_classes = []
+
+    keycloak_openid = KeycloakOpenID(
+        server_url=f'http://{settings.KEYCLOAK_SETTINGS["KEYCLOAK_SERVER"]}:{settings.KEYCLOAK_SETTINGS["KEYCLOAK_PORT"]}/',
+        client_id=f'{settings.KEYCLOAK_SETTINGS["CLIENT_ID"]}',
+        realm_name=f'{settings.KEYCLOAK_SETTINGS["REALM_NAME"]}',
+        client_secret_key=f'{settings.KEYCLOAK_SETTINGS["CLIENT_SECRET_KEY"]}')
+
     @swagger_auto_schema(
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
@@ -385,32 +404,37 @@ class KeyCloakLoginView(views.APIView):
             }
         ),
     )
-    @login_exempt
-    def post(self, request):
+    def post(self, request: Request) -> Response:
         # 从请求中获取用户名和密码
-        username = request.data.get('username')
-        password = request.data.get('password')
+        username = request.data.get('username', None)
+        password = request.data.get('password', None)
+        if username is None or password is None:
+            return Response({'detail': 'username or password are not present!'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 使用 Keycloak API 验证用户
-        response = self.authenticate_with_keycloak(username, password)
-        user_data = response.json()
-        if user_data:
-            # 检查用户是否在本地数据库中
-            user = get_user_model().objects.filter(username=username).first()
-
-            if not user:
-                # 如果用户不在本地数据库中，创建本地用户
-                user = get_user_model().objects.create(username=username)
-
-            # 返回令牌和成功响应
-            # token, created = Token.objects.get_or_create(user=user)
-            token = response.json().get("access_token")
-
-
-            return Response({'token': token}, status=status.HTTP_200_OK)
-        else:
+        # # 使用 Keycloak API 验证用户
+        # response = self.authenticate_with_keycloak(username, password)
+        # user_data = response.json()
+        # if user_data:
+        #     # 检查用户是否在本地数据库中
+        #     user = get_user_model().objects.filter(username=username).first()
+        #
+        #     if not user:
+        #         # 如果用户不在本地数据库中，创建本地用户
+        #         user = get_user_model().objects.create(username=username)
+        #
+        #     # 返回令牌和成功响应
+        #     # token, created = Token.objects.get_or_create(user=user)
+        #     token = response.json().get("access_token")
+        try:
+            kc_response = self.keycloak_openid.token(username, password)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+        token = kc_response.get('access_token', None)
+        if token is None:
             # 用户验证失败，返回错误响应
             return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+        else:
+            return Response({'token': token}, status=status.HTTP_200_OK)
 
     @classmethod
     def authenticate_with_keycloak(cls, username, password):
@@ -430,18 +454,32 @@ class KeyCloakLoginView(views.APIView):
             return response
         else:
             return None
+
+
 class KeyCloakViewSet(viewsets.ViewSet):
+    authentication_classes = [KeycloakTokenAuthentication]
+    permission_classes = [KeycloakIsAuthenticated]
+
 
     def __init__(self, *args, **kwargs):
         super(KeyCloakViewSet, self).__init__(*args, **kwargs)
+
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter('page', in_=openapi.IN_QUERY, type=openapi.TYPE_INTEGER),
+            openapi.Parameter('per_page', in_=openapi.IN_QUERY, type=openapi.TYPE_INTEGER),
+            openapi.Parameter('search', in_=openapi.IN_QUERY, type=openapi.TYPE_STRING),
+        ]
+    )
     @transaction.atomic
     @action(methods=["GET"], detail=False, url_path="get_users")
     @ApiLog("用户管理获取用户")
-    def get_cloak_user_manage(self, request):
-        page = int(request.query_params.get("page", 1))  # 获取请求中的页码参数，默认为第一页
-        per_page = int(request.query_params.get("per_page", 10))  # 获取请求中的每页结果数，默认为10
-        bk_token = request.COOKIES.get('bk_token', None)
-        res = KeyCloakUserController.get_user_list(**{"page": page,"per_page":per_page,"bk_token":bk_token})
+    def get_user(self, request: Request):
+        page = request.query_params.get("page", 1)  # 获取请求中的页码参数，默认为第一页
+        per_page = request.query_params.get("per_page", 10)  # 获取请求中的每页结果数，默认为10
+        # bk_token = request.COOKIES.get('bk_token', None)
+        res = KeyCloakUserController.get_user_list(**{"page": int(page), "per_page": int(per_page)
+            , "token": request.auth, "search":request.query_params.get('search', None)})
         return Response(res)
 
     @swagger_auto_schema(
@@ -452,7 +490,8 @@ class KeyCloakViewSet(viewsets.ViewSet):
                 'email': openapi.Schema(type=openapi.TYPE_STRING, description='User email'),
                 'lastName': openapi.Schema(type=openapi.TYPE_STRING, description='User last name'),
                 'password': openapi.Schema(type=openapi.TYPE_STRING, description='User password'),
-            }
+            },
+            required=['username', 'password']
         ),
     )
     @transaction.atomic
@@ -462,35 +501,52 @@ class KeyCloakViewSet(viewsets.ViewSet):
         res = KeyCloakUserController.create_user(**{"request": request})
         return Response(res)
 
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter('user_id', in_=openapi.IN_QUERY, type=openapi.TYPE_STRING)
+        ]
+    )
     @transaction.atomic
     @action(methods=["DELETE"], detail=False, url_path="delete_users")
     @ApiLog("用户管理删除用户")
-    def delete_keycloak_user_manage(self, request, *args, **kwargs):
+    def delete_user(self, request : Request, *args, **kwargs):
         """
         删除用户
         """
-        res = KeyCloakUserController.delete_user(**{"request":request})
+        user_id = request.query_params.get('user_id', None)
+        if user_id is None:
+            return Response({"error":"user id is not present"}, status=status.HTTP_400_BAD_REQUEST)
+        res = KeyCloakUserController.delete_user(**{"user_id": user_id, 'token':request.auth})
         return Response(res)
 
     @swagger_auto_schema(
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
-                'id': openapi.Schema(type=openapi.TYPE_STRING, description='User id'),
+                'user_id': openapi.Schema(type=openapi.TYPE_STRING, description='User id (Required)'),
                 'email': openapi.Schema(type=openapi.TYPE_STRING, description='User email'),
                 'firstName': openapi.Schema(type=openapi.TYPE_STRING, description='User first name'),
                 'lastName': openapi.Schema(type=openapi.TYPE_STRING, description='User last name'),
-            }
-        ),
+            },
+            required=['user_id']
+        )
     )
     @transaction.atomic
     @action(methods=["PUT"], detail=False, url_path="update_user")
     @ApiLog("用户管理修改用户信息")
-    def update_bk_user(self, request):
+    def update_user(self, request):
         """
         修改用户信息
         """
-        res = KeyCloakUserController.update_user(**{"request": request})
+        user_id = request.data.get('user_id', None)
+        if user_id is None:
+            return Response({"error": "user id is not present"}, status=status.HTTP_400_BAD_REQUEST)
+        payload = dict()
+        # 除了user_id其他属性放入payload
+        for k in request.data.keys():
+            if not k == 'user_id':
+                payload[k] = request.data[k]
+        res = KeyCloakUserController.update_user(**{"user_id":user_id, "payload":payload, "token":request.auth})
         return Response(res)
 
     @swagger_auto_schema(
@@ -509,10 +565,14 @@ class KeyCloakViewSet(viewsets.ViewSet):
         """
         重置用户密码
         """
-        id = request.data.get("id")
-        password = request.data.get("password")
-        bk_token = request.COOKIES.get('bk_token', None)
-        res = KeyCloakUserController.reset_password(**{"id":id,"password":password,"bk_token":bk_token})
+        # id = request.data.get("id")
+        # password = request.data.get("password")
+        # bk_token = request.COOKIES.get('bk_token', None)
+        user_id = request.data.get('user_id', None)
+        password = request.data.get('password', None)
+        if user_id is None or password is None:
+            return Response({"error": "user_id or password is not present"}, status=status.HTTP_400_BAD_REQUEST)
+        res = KeyCloakUserController.reset_password(**{"user_id": user_id, "password": password, "token": request.auth})
         return Response(res)
 
 
@@ -1171,7 +1231,6 @@ def login_info(request):
     pattern = re.compile(r"weops_saas[-_]+[vV]?([\d.]*)")
     version = [i.strip() for i in pattern.findall(os.getenv("FILE_NAME", "weops_saas-3.5.3.tar.gz")) if i.strip()]
 
-
     user_super, _, user_menus, chname, operate_ids = get_user_roles(request.user)
     notify_day = 30
     expired_day = 365
@@ -1216,6 +1275,7 @@ def login_info(request):
             },
         }
     )
+
 
 def get_init_data():
     init_data = {
