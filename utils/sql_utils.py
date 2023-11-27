@@ -1,9 +1,9 @@
 import os
 
 import pymysql
-from MySQLdb.cursors import DictCursor
 from django.conf import settings
 from django.db import connection
+from MySQLdb.cursors import DictCursor
 
 from blueapps.utils.logger import logger
 
@@ -26,13 +26,17 @@ class SQLClient(object):
         """
         self.connection.close()
 
-    def execute_mysql_sql(self, sql, get_result=True):
+    def execute_mysql_sql(self, sql, args=None, get_result=True):
         """
         执行SQL
         """
         cursor = self.connection.cursor(DictCursor)
         try:
-            cursor.execute(sql)
+            if isinstance(args, str):
+                args = [args]
+            elif isinstance(args, int):
+                args = [str(args)]
+            cursor.execute(sql, args)
             if get_result:
                 result = list(cursor.fetchall())
             else:
@@ -63,7 +67,6 @@ class SQLClient(object):
             result = fun()
         self.disconnect()
         return result
-
 
 
 class NativeSql(object):
