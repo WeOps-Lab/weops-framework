@@ -95,6 +95,14 @@ class SysUser(TimeInfo, MaintainerInfo):
         return copy.deepcopy(self)
 
     @property
+    def username(self) -> str:
+        return self.bk_username
+
+    @property
+    def is_authenticated(self) -> bool:
+        return True
+
+    @property
     def _super(self):
         """
         判断当前用户是否是weops超管

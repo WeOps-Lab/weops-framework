@@ -29,7 +29,7 @@ from apps.system_mgmt.views import (
     SysSettingViewSet,
     SysUserViewSet,
     UserManageViewSet,
-    login_info, KeyCloakLoginView, KeyCloakViewSet,
+    KeyCloakViewSet,
 )
 
 urlpatterns = [
@@ -81,8 +81,7 @@ urlpatterns += [
 urlpatterns += [
     # 系统管理
     url(r"^system/mgmt/", include("apps.system_mgmt.urls")),
-    url(r"^login_info/$", login_info),
-    url(r"^keycloak_login/$", KeyCloakLoginView.as_view(), name='keycloak_login'),
+
 
 ]
 

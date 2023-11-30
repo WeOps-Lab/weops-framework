@@ -5,6 +5,9 @@ from django.core.handlers.wsgi import WSGIRequest
 from keycloak import KeycloakOpenID
 from django.conf import LazySettings
 from django.contrib.auth import get_user_model
+
+from apps.system_mgmt.models import SysUser
+from apps.system_mgmt.utils_package.controller import KeyCloakUserController
 from keycloak import KeycloakAdmin
 from keycloak import KeycloakOpenIDConnection
 
@@ -12,13 +15,11 @@ settings = LazySettings()
 
 
 class KeycloakTokenAuthentication(BaseAuthentication):
-
     keycloak_openid = KeycloakOpenID(
         server_url=f'http://{settings.KEYCLOAK_SETTINGS["KEYCLOAK_SERVER"]}:{settings.KEYCLOAK_SETTINGS["KEYCLOAK_PORT"]}/',
         client_id=f'{settings.KEYCLOAK_SETTINGS["CLIENT_ID"]}',
         realm_name=f'{settings.KEYCLOAK_SETTINGS["REALM_NAME"]}',
         client_secret_key=f'{settings.KEYCLOAK_SETTINGS["CLIENT_SECRET_KEY"]}')
-
 
     def authenticate(self, request: WSGIRequest):
         '''
@@ -33,5 +34,8 @@ class KeycloakTokenAuthentication(BaseAuthentication):
         tokeninfo = self.keycloak_openid.introspect(token)
         if not tokeninfo.get('active', False):
             raise AuthenticationFailed('Invalid token')
-        user = get_user_model()()
+        # 根据token找对对应的sysuser
+        username = tokeninfo['username']
+        user = SysUser.objects.get(bk_username=username)
+        # user = get_user_model()()
         return user, token

@@ -12,7 +12,7 @@ import requests
 from casbin_adapter.models import CasbinRule
 from django.conf import settings
 from django.db import transaction
-from keycloak import KeycloakAdmin, KeycloakOpenIDConnection
+from keycloak import KeycloakAdmin, KeycloakOpenIDConnection, KeycloakOpenID
 
 # from apps.monitor_mgmt.models import CloudPlatGroup
 from apps.system_mgmt.celery_tasks import (
@@ -204,6 +204,19 @@ class UserController(object):
             try:
                 normal_role = UserModels.get_normal_user()
                 user_data = UserUtils.formative_user_data(**{"data": request.data, "normal_role": normal_role})
+
+                kc_user = dict()
+                username = request.data.get('username', None)
+                password = request.data.get('password', None)
+                kc_user['username'] = username
+                kc_user['email'] = request.data.get('email', None)
+                kc_user['lastName'] = request.data.get('display_name', None)
+                kc_user['enabled'] = True
+                kc_user['credentials'] = [{"value": password, "type": 'password' }]
+                result = KeyCloakUserController.create_user(kc_user, request.auth).get('error', None)
+                if result is not None:
+                    raise Exception(result)
+
                 serializer = UserModels.create(**{"model_manage": self, "data": user_data})
                 # 给新增对用户加入普通角色组
                 UserModels.add_many_to_many_field(
@@ -218,21 +231,23 @@ class UserController(object):
                     app_module="系统管理",
                     obj_type="用户管理",
                 )
-                res = UserUtils.username_manage_add_user(
-                    **{"cookies": request.COOKIES, "data": request.data, "manage_api": manage_api}
-                )
+                # 蓝鲸接口
+                # res = UserUtils.username_manage_add_user(
+                #     **{"cookies": request.COOKIES, "data": request.data, "manage_api": manage_api}
+                # )
+                res = {"result": True}
             except Exception as user_error:
                 logger.exception("新增用户调用用户管理接口失败. message={}".format(user_error))
-                res = {"result": False}
+                res = {"result": False, 'error': str(user_error)}
 
             if not res["result"]:
                 # 请求错误，或者创建失败 都回滚
                 transaction.savepoint_rollback(sid)
                 transaction.savepoint_commit(sid)
 
-                return {"data": {"detail": "创建用户失败! "}, "status": 500}
+                return {"data": {"detail": f"创建用户失败! {res['error']}"}, "status": 500}
 
-            UserModels.user_update_bk_user_id(**{"instance": serializer.instance, "bk_user_id": res["data"]["id"]})
+            # UserModels.user_update_bk_user_id(**{"instance": serializer.instance, "bk_user_id": res["data"]["id"]})
             transaction.savepoint_commit(sid)
 
         # casbin_mesh 新增用户
@@ -280,14 +295,15 @@ class UserController(object):
                     app_module="系统管理",
                     obj_type="用户管理",
                 )
-                res = UserUtils.username_manage_update_user(
-                    **{
-                        "cookies": request.COOKIES,
-                        "data": request.data,
-                        "manage_api": manage_api,
-                        "bk_user_id": bk_user_id,
-                    }
-                )
+                # res = UserUtils.username_manage_update_user(
+                #     **{
+                #         "cookies": request.COOKIES,
+                #         "data": request.data,
+                #         "manage_api": manage_api,
+                #         "bk_user_id": bk_user_id,
+                #     }
+                # )
+                res = {'result':True}
 
             except Exception as user_error:
                 logger.exception("修改用户调用用户管理接口失败. message={}".format(user_error))
@@ -362,6 +378,10 @@ class UserController(object):
                 user_obj = UserModels.get_user_objects(user_id=user_id)
                 user_roles = user_obj.roles.all()
                 rules = [[user_obj.bk_username, i.role_name] for i in user_roles]
+
+                kc_user = KeyCloakUserController.get_user_by_name(user_obj.bk_username, request.auth)
+                KeyCloakUserController.delete_user(kc_user['id'], request.auth)
+
                 delete_user_belong_roles = {i.id for i in user_roles}
                 UserModels.delete_user(**{"user": user_obj})
                 OperationLog.objects.create(
@@ -373,10 +393,10 @@ class UserController(object):
                     app_module="系统管理",
                     obj_type="用户管理",
                 )
-                res = UserUtils.username_manage_delete_user(
-                    **{"cookies": request.COOKIES, "data": [{"id": bk_user_id}], "manage_api": manage_api}
-                )
-
+                # res = UserUtils.username_manage_delete_user(
+                #     **{"cookies": request.COOKIES, "data": [{"id": bk_user_id}], "manage_api": manage_api}
+                # )
+                res = {'result' : True}
             except Exception as user_error:
                 logger.exception("删除用户调用用户管理接口失败. message={}".format(user_error))
                 res = {"result": False}
@@ -852,8 +872,6 @@ class RoleController(object):
 
 
 class KeyCloakUserController(object):
-    keycloak_server = settings.KEYCLOAK_SERVER
-    keycloak_port = settings.KEYCLOAK_PORT
 
     @classmethod
     def get_keycloak_admin(cls, token: str) -> KeycloakAdmin:
@@ -870,97 +888,29 @@ class KeyCloakUserController(object):
         return keycloak_admin
 
     @classmethod
-    def retrieve_access_token(cls):
-        url = f"http://{cls.keycloak_server}:{cls.keycloak_port}/realms/master/protocol/openid-connect/token"
-
-        data = {
-            "client_id": "security-admin-console",
-            "username": "admin",
-            "password": "admin",
-            "grant_type": "password"
-        }
-
-        response = requests.post(url, data=data)
-
-        if response.status_code == 200:
-            return response.json().get("access_token")
-        else:
-            return None
+    def get_access_token(cls, username : str, password : str) -> str:
+        keycloak_openid = KeycloakOpenID(
+            server_url=f'http://{settings.KEYCLOAK_SETTINGS["KEYCLOAK_SERVER"]}:{settings.KEYCLOAK_SETTINGS["KEYCLOAK_PORT"]}/',
+            client_id=f'{settings.KEYCLOAK_SETTINGS["CLIENT_ID"]}',
+            realm_name=f'{settings.KEYCLOAK_SETTINGS["REALM_NAME"]}',
+            client_secret_key=f'{settings.KEYCLOAK_SETTINGS["CLIENT_SECRET_KEY"]}')
+        token = keycloak_openid.token(username, password).get('access_token', None)
+        return token
 
     @classmethod
     def create_user(cls, user = None, token = None):
-        # # 构建创建用户的URL
-        # url = f"http://{cls.keycloak_server}:{cls.keycloak_port}/admin/realms/master/users"
-        # request = kwargs["request"]
-        # bk_token = request.COOKIES.get('bk_token', None)
-        # # 添加访问令牌到请求头
-        # headers = {
-        #     "Authorization": f"Bearer {bk_token}",
-        #     "Content-Type": "application/json"
-        # }
-        # request = kwargs["request"]
-        # user_data = request.data
-        # user_data["enabled"] = True
-        # password = user_data.pop("password")
-        # # 发送POST请求来创建用户
-        # response = requests.post(url, headers=headers, data=json.dumps(user_data))
-        #
-        # if response.status_code == 201:
-        #     # 用户已成功创建
-        #     # 根据用户名获取id
-        #     user_info_url = f'http://{cls.keycloak_server}:{cls.keycloak_port}/admin/realms/master/users'
-        #     params = {
-        #         "username": user_data.get("username")
-        #     }
-        #     user_info_response = requests.get(user_info_url, headers=headers, params=params)
-        #     if user_info_response.status_code == 200:
-        #         id = user_info_response.json()[0].get("id")
-        #         res = cls.reset_password(**{"id": id, "password": password})
-        #         return {"message": "创建用户成功"}
-        # else:
-        #     # 创建用户失败
-        #     return {"error": "创建失败"}
+        '''
+        返回的字典包含新创建用户的id
+        '''
         try:
-            cls.get_keycloak_admin(token).create_user(user)
+            # 该方法返回创建用户的id
+            id = cls.get_keycloak_admin(token).create_user(user)
         except Exception as e:
             return {'error':str(e)}
-        return {'message':'创建成功'}
-
-
-
+        return {'message':'创建成功', 'id' : id}
 
     @classmethod
     def get_user_list(cls, page=None, per_page=None, search = None, token=None):
-        # bk_token = cls.retrieve_access_token()
-        # url = f"http://{cls.keycloak_server}:{cls.keycloak_port}/admin/realms/master/users"
-        # headers = {
-        #     "Authorization": f"Bearer {bk_token}"
-        # }
-        #
-        # # 请求总用户数
-        # total_users_response = requests.get(url, headers=headers, params={"count": True})
-        # if total_users_response.status_code == 200:
-        #     total_users = total_users_response.json()
-        #     total_count = len(total_users)
-        # else:
-        #     logging.error(f"Failed to retrieve total user count. Status code: {total_users_response.status_code}")
-        #     total_count = 0
-
-        # users = cls.get_keycloak_admin(bk_token).get_users({})
-        # # 请求分页用户列表
-        # if page and per_page:
-        #     first = (page - 1) * per_page
-        #     max = per_page
-        #     params = {"first": first, "max": max}
-        #     user_list_response = cls.get_keycloak_admin(bk_token).get_users(params)
-        #     if user_list_response.status_code == 200:
-        #         users = user_list_response.json()
-        #     else:
-        #         logging.error(f"Failed to retrieve user list. Status code: {user_list_response.status_code}")
-        #         users = []
-        # else:
-        #     users = []
-
         first = (page - 1) * per_page
         max = per_page
         params = {"first": first, "max": max, "search":search}
@@ -968,30 +918,25 @@ class KeyCloakUserController(object):
         return {"count": len(users), "users": users}
 
     @classmethod
+    def get_user_by_id(cls, id = None, token=None):
+        params = {
+            'exact': True,
+            'idpUserId': id
+        }
+        users = cls.get_keycloak_admin(token).get_users(params)
+        return users[0] if len(users) != 0 else None
+
+    @classmethod
+    def get_user_by_name(cls, name=None, token=None):
+        params = {
+            'exact' : True,
+            'username' : name
+        }
+        users = cls.get_keycloak_admin(token).get_users(params)
+        return users[0] if len(users) != 0 else None
+
+    @classmethod
     def delete_user(cls, user_id : str, token : str):
-        # id = kwargs["request"].query_params.get("id")
-        # request = kwargs["request"]
-        # bk_token = request.COOKIES.get('bk_token', None)
-        # # 构建删除用户的URL
-        # url = f"http://{cls.keycloak_server}:{cls.keycloak_port}/admin/realms/master/users/{id}"
-        #
-        # # 添加访问令牌到请求头
-        # headers = {
-        #     "Authorization": f"Bearer {bk_token}"
-        # }
-        #
-        # # 发送DELETE请求来删除用户
-        # response = requests.delete(url, headers=headers)
-        #
-        # if response.status_code == 204:
-        #     # 用户已成功删除
-        #     return {"message": "User deleted successfully"}
-        # elif response.status_code == 404:
-        #     # 用户不存在
-        #     return {"error": "User not found"}
-        # else:
-        #     # 删除用户失败
-        #     return {"error": "User deletion failed"}
         try:
             cls.get_keycloak_admin(token).delete_user(user_id)
         except Exception as e:
@@ -1001,30 +946,6 @@ class KeyCloakUserController(object):
 
     @classmethod
     def update_user(cls, user_id:str, payload:dict, token : str):
-        # request = kwargs["request"]
-        # id = request.data.get("id")
-        # request = kwargs["request"]
-        # bk_token = request.COOKIES.get('bk_token', None)
-        # user_data = request.data
-        # user_data.pop("id")
-        # # 构建修改用户信息的URL
-        # url = f"http://{cls.keycloak_server}:{cls.keycloak_port}/admin/realms/master/users/{id}"
-        #
-        # # 添加访问令牌到请求头
-        # headers = {
-        #     "Authorization": f"Bearer {bk_token}",
-        #     "Content-Type": "application/json"
-        # }
-        #
-        # # 发送PUT请求来修改用户信息
-        # response = requests.put(url, headers=headers, data=json.dumps(user_data))
-        # print(response.status_code)
-        # if response.status_code == 204:
-        #     # 用户信息已成功修改
-        #     return {"message": "用户信息修改成功"}
-        # else:
-        #     # 修改用户信息失败
-        #     return {"message": f"用户信息修改失败，{response.text}"}
         try:
             cls.get_keycloak_admin(token).update_user(user_id, payload)
         except Exception as e:
@@ -1033,34 +954,6 @@ class KeyCloakUserController(object):
 
     @classmethod
     def reset_password(cls, user_id: str, password: str, token: str):
-        # id = kwargs["id"]
-        # password = kwargs["password"]
-        # bk_token = kwargs["bk_token"]
-        # # 构建重置密码的URL
-        # url = f"http://{cls.keycloak_server}:{cls.keycloak_port}/admin/realms/master/users/{id}/reset-password"
-        #
-        # # 添加访问令牌到请求头
-        # headers = {
-        #     "Authorization": f"Bearer {bk_token}",
-        #     "Content-Type": "application/json"
-        # }
-        #
-        # # 构建包含新密码的数据
-        # data = {
-        #     "type": "password",
-        #     "temporary": False,
-        #     "value": password
-        # }
-        #
-        # # 发送PUT请求来重置密码
-        # response = requests.put(url, headers=headers, json=data)
-        #
-        # if response.status_code == 204:
-        #     # 密码已成功重置
-        #     return {"message": "密码修改成功", "status": 200}
-        # else:
-        #     # 重置密码失败
-        #     return {"error": "密码修改失败"}
         try:
             cls.get_keycloak_admin(token).set_user_password(user_id, password, False)
         except Exception as e:

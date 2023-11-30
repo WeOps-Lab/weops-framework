@@ -15,10 +15,40 @@ import time
 import random
 import string
 from django import test
+from django.conf import LazySettings
+from keycloak import KeycloakOpenID, KeycloakOpenIDConnection, KeycloakAdmin
+
 from apps.system_mgmt.models import SysRole
 
 from .user_manages import UserManageApi
 from .utils_package.db_utils import UserUtils
+
+class PythonKeycloakTest(test.TestCase):
+    def setUp(self):
+        settings = LazySettings()
+        self.username = 'admin'
+        self.password = 'admin'
+        self.keycloak_openid = KeycloakOpenID(
+            server_url=f'http://{settings.KEYCLOAK_SETTINGS["KEYCLOAK_SERVER"]}:{settings.KEYCLOAK_SETTINGS["KEYCLOAK_PORT"]}/',
+            client_id=f'{settings.KEYCLOAK_SETTINGS["CLIENT_ID"]}',
+            realm_name=f'{settings.KEYCLOAK_SETTINGS["REALM_NAME"]}',
+            client_secret_key=f'{settings.KEYCLOAK_SETTINGS["CLIENT_SECRET_KEY"]}')
+        self.token = self.keycloak_openid.token(self.username, self.password)
+
+        self.keycloak_connection = KeycloakOpenIDConnection(
+            server_url=f'http://{settings.KEYCLOAK_SETTINGS["KEYCLOAK_SERVER"]}:{settings.KEYCLOAK_SETTINGS["KEYCLOAK_PORT"]}/',
+            username=self.username,
+            password=self.password,
+            realm_name=f'{settings.KEYCLOAK_SETTINGS["REALM_NAME"]}',
+            client_id=f'{settings.KEYCLOAK_SETTINGS["CLIENT_ID"]}',
+            client_secret_key=f'{settings.KEYCLOAK_SETTINGS["CLIENT_SECRET_KEY"]}',
+            verify=True)
+        self.keycloak_admin = KeycloakAdmin(connection=self.keycloak_connection)
+
+    def test_method(self):
+        rpt = self.keycloak_openid.entitlement(self.token['access_token'], 'cc698101-935f-40b5-94ff-e46d71b69b37')
+        print(rpt)
+        pass
 
 
 class TestUserManages(test.TestCase):
