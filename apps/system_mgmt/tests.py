@@ -26,17 +26,17 @@ from .utils_package.db_utils import UserUtils
 class PythonKeycloakTest(test.TestCase):
     def setUp(self):
         settings = LazySettings()
-        self.username = 'admin'
-        self.password = 'admin'
+        self.username = 'normal_user'
+        self.password = 'normal_user'
         self.keycloak_openid = KeycloakOpenID(
-            server_url=f'http://{settings.KEYCLOAK_SETTINGS["KEYCLOAK_SERVER"]}:{settings.KEYCLOAK_SETTINGS["KEYCLOAK_PORT"]}/',
+            server_url=f'http://{settings.KEYCLOAK_SETTINGS["HOST"]}:{settings.KEYCLOAK_SETTINGS["PORT"]}/',
             client_id=f'{settings.KEYCLOAK_SETTINGS["CLIENT_ID"]}',
             realm_name=f'{settings.KEYCLOAK_SETTINGS["REALM_NAME"]}',
             client_secret_key=f'{settings.KEYCLOAK_SETTINGS["CLIENT_SECRET_KEY"]}')
         self.token = self.keycloak_openid.token(self.username, self.password)
 
         self.keycloak_connection = KeycloakOpenIDConnection(
-            server_url=f'http://{settings.KEYCLOAK_SETTINGS["KEYCLOAK_SERVER"]}:{settings.KEYCLOAK_SETTINGS["KEYCLOAK_PORT"]}/',
+            server_url=f'http://{settings.KEYCLOAK_SETTINGS["HOST"]}:{settings.KEYCLOAK_SETTINGS["PORT"]}/',
             username=self.username,
             password=self.password,
             realm_name=f'{settings.KEYCLOAK_SETTINGS["REALM_NAME"]}',
@@ -46,6 +46,19 @@ class PythonKeycloakTest(test.TestCase):
         self.keycloak_admin = KeycloakAdmin(connection=self.keycloak_connection)
 
     def test_method(self):
+        certs = self.keycloak_openid.certs()
+        print(certs)
+        KEYCLOAK_PUBLIC_KEY = "-----BEGIN PUBLIC KEY-----\n" + self.keycloak_openid.public_key() + "\n-----END PUBLIC KEY-----"
+        options = {"verify_signature": True, "verify_aud": False, "verify_exp": True}
+        self.keycloak_openid.load_authorization_config("auth_info.json")
+        policies = self.keycloak_openid.get_policies(self.token['access_token'], method_token_info='decode',
+                                                key=KEYCLOAK_PUBLIC_KEY, options=options)
+        # permissions = self.keycloak_openid.get_permissions(self.token['access_token'], method_token_info='introspect')
+        # 获取所有有权限的资源名
+        permissions = self.keycloak_openid.uma_permissions(self.token['access_token'])
+        # 填入资源名，有权限有返回，没有权限返回403 exception
+        permission = self.keycloak_openid.uma_permissions(self.token['access_token'], permissions="Default Resource")
+        token_info = self.keycloak_openid.decode_token(self.token['access_token'], key=KEYCLOAK_PUBLIC_KEY, options=options)
         rpt = self.keycloak_openid.entitlement(self.token['access_token'], 'cc698101-935f-40b5-94ff-e46d71b69b37')
         print(rpt)
         pass

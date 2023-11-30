@@ -10,6 +10,8 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
+import os
+
 from config import RUN_VER
 
 if RUN_VER == "open":
@@ -46,8 +48,8 @@ DATABASES = {
         "ENGINE": "django.db.backends.mysql",
         "NAME": APP_CODE,  # noqa
         "USER": "root",
-        "PASSWORD": "1",
-        "HOST": "localhost",
+        "PASSWORD": "root",
+        "HOST": os.environ.get('BKAPP_MYSQL_HOST', 'mysql-container'),
         "PORT": "3306",
         # 单元测试 DB 配置，建议不改动
         "TEST": {"NAME": "test_db", "CHARSET": "utf8", "COLLATION": "utf8_general_ci"},

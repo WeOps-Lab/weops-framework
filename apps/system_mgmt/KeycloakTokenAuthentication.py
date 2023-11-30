@@ -16,7 +16,7 @@ settings = LazySettings()
 
 class KeycloakTokenAuthentication(BaseAuthentication):
     keycloak_openid = KeycloakOpenID(
-        server_url=f'{settings.KEYCLOAK_SETTINGS["KEYCLOAK_SERVER_URL"]}/',
+        server_url=f'http://{settings.KEYCLOAK_SETTINGS["HOST"]}:{settings.KEYCLOAK_SETTINGS["PORT"]}/',
         client_id=f'{settings.KEYCLOAK_SETTINGS["CLIENT_ID"]}',
         realm_name=f'{settings.KEYCLOAK_SETTINGS["REALM_NAME"]}',
         client_secret_key=f'{settings.KEYCLOAK_SETTINGS["CLIENT_SECRET_KEY"]}')

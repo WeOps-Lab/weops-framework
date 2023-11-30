@@ -4,10 +4,10 @@ services:
     image: mysql:latest
     container_name: mysql-container
     environment:
-      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: weops_saas
-      MYSQL_USER: root
-      MYSQL_PASSWORD: jIUxdSqwQJss
+#      MYSQL_USER: root
+#      MYSQL_PASSWORD: root
     ports:
       - "3306:3306"
     volumes:
@@ -20,12 +20,12 @@ services:
       - "6379:6379"
 
   casbin-mesh:
-    image: casbin-mesh:latest
+    image: ghcr.io/casbin/casbin-mesh:latest
     container_name: casbin-mesh-container
     environment:
       # Casbin Mesh configuration environment variables
       CASBIN_MESH_DATABASE: mysql
-      CASBIN_MESH_DATABASE_CONNECTION_STRING: "mysql:mysql:3306?dbname=weops_saas&username=root&password=jIUxdSqwQJss"
+      CASBIN_MESH_DATABASE_CONNECTION_STRING: "mysql:mysql:3306?dbname=weops_saas&username=root&password=root"
       CASBIN_MESH_REDIS_HOST: redis
       CASBIN_MESH_REDIS_PORT: 6379
     ports:
@@ -41,10 +41,19 @@ services:
       - "8080:8080"
     command: start-dev
 
-networks:
-  default:
-    external:
-      name: bridge
+  weops-lite:
+    build:
+      context: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+
+#networks:
+#  default:
+#    external:
+#      name: bridge
+
 #
 #version: '3'
 #services:
