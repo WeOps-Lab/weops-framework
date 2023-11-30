@@ -876,7 +876,7 @@ class KeyCloakUserController(object):
     @classmethod
     def get_keycloak_admin(cls, token: str) -> KeycloakAdmin:
         keycloak_connection = KeycloakOpenIDConnection(
-            server_url=f'http://{settings.KEYCLOAK_SETTINGS["KEYCLOAK_SERVER"]}:{settings.KEYCLOAK_SETTINGS["KEYCLOAK_PORT"]}/',
+            server_url=f'{settings.KEYCLOAK_SETTINGS["KEYCLOAK_SERVER_URL"]}/',
             realm_name=f'{settings.KEYCLOAK_SETTINGS["REALM_NAME"]}',
             client_id=f'{settings.KEYCLOAK_SETTINGS["CLIENT_ID"]}',
             client_secret_key=f'{settings.KEYCLOAK_SETTINGS["CLIENT_SECRET_KEY"]}',
@@ -890,7 +890,7 @@ class KeyCloakUserController(object):
     @classmethod
     def get_access_token(cls, username : str, password : str) -> str:
         keycloak_openid = KeycloakOpenID(
-            server_url=f'http://{settings.KEYCLOAK_SETTINGS["KEYCLOAK_SERVER"]}:{settings.KEYCLOAK_SETTINGS["KEYCLOAK_PORT"]}/',
+            server_url=f'{settings.KEYCLOAK_SETTINGS["KEYCLOAK_SERVER_URL"]}/',
             client_id=f'{settings.KEYCLOAK_SETTINGS["CLIENT_ID"]}',
             realm_name=f'{settings.KEYCLOAK_SETTINGS["REALM_NAME"]}',
             client_secret_key=f'{settings.KEYCLOAK_SETTINGS["CLIENT_SECRET_KEY"]}')
