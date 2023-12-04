@@ -61,7 +61,7 @@ class AppExceptionMiddleware(MiddlewareMixin):
             % (
                 traceback.format_exc(),
                 request.path,
-                request.user.username,
+                request.user,
                 request.method,
                 json.dumps(getattr(request, request.method, None)),
             )

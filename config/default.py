@@ -91,7 +91,11 @@ KEYCLOAK_SETTINGS = {
     "PORT" : os.environ.get("BKAPP_KEYCLOAK_SERVER_URL", "8080"),
     "REALM_NAME" : os.environ.get("BKAPP_REALM_NAME", "master"),
     "CLIENT_ID" : os.environ.get("BKAPP_CLIENT_ID", "weops_lite"),
+    "ID_OF_CLIENT" :  os.environ.get("BKAPP_ID_OF_CLIENT", "a72a5bed-8673-48e1-ac0a-97ba3c06c88f"),
     "CLIENT_SECRET_KEY" : os.environ.get("BKAPP_CLIENT_SECRET_KEY", "UQym8RIjp4X4hxMxIkL1hOktVU1auDa3"),
+    "ADMIN_USERNAME" : os.environ.get("BKAPP_ADMIN_USERNAME", "admin"),
+    "ADMIN_PASSWORD" : os.environ.get("BKAPP_ADMIN_USERNAME", "admin"),
+    "AUTH_INFO_FILE_PATH" : os.environ.get("BKAPP_ADMIN_USERNAME", "auth_info.json"),
 }
 
 

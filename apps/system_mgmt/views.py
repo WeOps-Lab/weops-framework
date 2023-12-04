@@ -68,7 +68,7 @@ from apps.system_mgmt.serializers import (
 )
 from apps.system_mgmt.user_manages import UserManageApi
 from apps.system_mgmt.utils import UserUtils
-from apps.system_mgmt.utils_package.controller import RoleController, UserController, KeyCloakUserController
+from apps.system_mgmt.utils_package.controller import RoleController, UserController, KeycloakUserController, KeycloakRoleController, KeycloakPermissionController
 from apps.system_mgmt.utils_package.inst_permissions import InstPermissionsUtils
 from blueapps.account.components.weixin.weixin_utils import WechatUtils
 from blueapps.account.decorators import login_exempt
@@ -405,7 +405,7 @@ class KeyCloakLoginView(views.APIView):
         if username is None or password is None:
             return Response({'detail': 'username or password are not present!'}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            token = KeyCloakUserController.get_access_token(username, password)
+            token = KeycloakUserController.get_access_token(username, password)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         if token is None:
@@ -415,13 +415,10 @@ class KeyCloakLoginView(views.APIView):
             return Response({'token': token}, status=status.HTTP_200_OK)
 
 
-class KeyCloakViewSet(viewsets.ViewSet):
+class KeyCloakUserViewSet(viewsets.ViewSet):
+
     authentication_classes = [KeycloakTokenAuthentication]
     permission_classes = [KeycloakIsAuthenticated]
-
-
-    def __init__(self, *args, **kwargs):
-        super(KeyCloakViewSet, self).__init__(*args, **kwargs)
 
     @swagger_auto_schema(
         manual_parameters=[
@@ -430,15 +427,12 @@ class KeyCloakViewSet(viewsets.ViewSet):
             openapi.Parameter('search', in_=openapi.IN_QUERY, type=openapi.TYPE_STRING),
         ]
     )
-    @transaction.atomic
-    @action(methods=["GET"], detail=False, url_path="get_users")
-    @ApiLog("用户管理获取用户")
-    def get_user(self, request: Request):
+    def list(self, request: Request):
         page = request.query_params.get("page", 1)  # 获取请求中的页码参数，默认为第一页
         per_page = request.query_params.get("per_page", 10)  # 获取请求中的每页结果数，默认为10
         # bk_token = request.COOKIES.get('bk_token', None)
-        res = KeyCloakUserController.get_user_list(**{"page": int(page), "per_page": int(per_page)
-            , "token": request.auth, "search":request.query_params.get('search', None)})
+        res = KeycloakUserController.get_user_list(**{"page": int(page), "per_page": int(per_page)
+            , "search": request.query_params.get('search', None)})
         return Response(res)
 
     @swagger_auto_schema(
@@ -453,96 +447,143 @@ class KeyCloakViewSet(viewsets.ViewSet):
             required=['username', 'password']
         ),
     )
-    @transaction.atomic
-    @action(methods=["POST"], detail=False, url_path="create_user")
-    @ApiLog("用户管理创建用户")
-    def create_keycloak_user_manage(self, request, *args, **kwargs):
+    def create(self, request):
         user = dict()
         username = request.data.get('username', None)
         password = request.data.get('password', None)
         if username is None or password is None:
-            return Response({"error":"password or username are not present"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "password or username are not present"}, status=status.HTTP_400_BAD_REQUEST)
         user['username'] = username
         user['email'] = request.data.get('email', None)
         user['lastName'] = request.data.get('lastName', None)
         user['enabled'] = True
-        user['credentials'] = [{"value": password,"type": 'password',}]
-        res = KeyCloakUserController.create_user(**{"user": user, 'token':request.auth})
-        return Response(res)
+        user['credentials'] = [{"value": password, "type": 'password', }]
+        try:
+            id = KeycloakUserController.create_user(**{"user": user})
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'id': id}, status=status.HTTP_201_CREATED)
 
     @swagger_auto_schema(
         manual_parameters=[
-            openapi.Parameter('user_id', in_=openapi.IN_QUERY, type=openapi.TYPE_STRING)
+            openapi.Parameter('id', openapi.IN_PATH, description="User ID", type=openapi.TYPE_STRING)
         ]
     )
-    @transaction.atomic
-    @action(methods=["DELETE"], detail=False, url_path="delete_users")
-    @ApiLog("用户管理删除用户")
-    def delete_user(self, request : Request, *args, **kwargs):
+    def destroy(self, request: Request, pk: str):
         """
         删除用户
         """
-        user_id = request.query_params.get('user_id', None)
-        if user_id is None:
-            return Response({"error":"user id is not present"}, status=status.HTTP_400_BAD_REQUEST)
-        res = KeyCloakUserController.delete_user(**{"user_id": user_id, 'token':request.auth})
-        return Response(res)
+        user_id = id
+        try:
+            KeycloakUserController.delete_user(**{"user_id": pk})
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'id': pk}, status=status.HTTP_200_OK)
 
     @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter('id', openapi.IN_PATH, description="User ID", type=openapi.TYPE_STRING)
+        ],
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
-                'user_id': openapi.Schema(type=openapi.TYPE_STRING, description='User id (Required)'),
                 'email': openapi.Schema(type=openapi.TYPE_STRING, description='User email'),
                 'firstName': openapi.Schema(type=openapi.TYPE_STRING, description='User first name'),
                 'lastName': openapi.Schema(type=openapi.TYPE_STRING, description='User last name'),
-            },
-            required=['user_id']
+            }
         )
     )
-    @transaction.atomic
-    @action(methods=["PUT"], detail=False, url_path="update_user")
-    @ApiLog("用户管理修改用户信息")
-    def update_user(self, request):
+    def update(self, request: Request, pk: str):
         """
         修改用户信息
         """
-        user_id = request.data.get('user_id', None)
-        if user_id is None:
-            return Response({"error": "user id is not present"}, status=status.HTTP_400_BAD_REQUEST)
         payload = dict()
-        # 除了user_id其他属性放入payload
         for k in request.data.keys():
-            if not k == 'user_id':
                 payload[k] = request.data[k]
-        res = KeyCloakUserController.update_user(**{"user_id":user_id, "payload":payload, "token":request.auth})
-        return Response(res)
+        try:
+            KeycloakUserController.update_user(**{"user_id": pk, "payload": payload})
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'id': pk}, status=status.HTTP_200_OK)
 
     @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter('id', openapi.IN_PATH, description="User ID", type=openapi.TYPE_STRING)
+        ],
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
-                'id': openapi.Schema(type=openapi.TYPE_STRING, description='User id'),
                 'password': openapi.Schema(type=openapi.TYPE_STRING, description='User password'),
             }
         ),
     )
-    @transaction.atomic
-    @action(methods=["PUT"], detail=False, url_path="reset_password")
-    @ApiLog("用户管理重置密码")
-    def reset_user_password(self, request):
+    def partial_update(self, request: Request, pk: str):
         """
         重置用户密码
         """
-        # id = request.data.get("id")
-        # password = request.data.get("password")
-        # bk_token = request.COOKIES.get('bk_token', None)
-        user_id = request.data.get('user_id', None)
         password = request.data.get('password', None)
-        if user_id is None or password is None:
-            return Response({"error": "user_id or password is not present"}, status=status.HTTP_400_BAD_REQUEST)
-        res = KeyCloakUserController.reset_password(**{"user_id": user_id, "password": password, "token": request.auth})
+        if password is None:
+            return Response({"error": "password is not present"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            KeycloakUserController.reset_password(**{"user_id": pk, "password": password})
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'id': pk}, status=status.HTTP_200_OK)
+
+class KeyCloakRoleViewSet(viewsets.ViewSet):
+
+    authentication_classes = [KeycloakTokenAuthentication]
+    permission_classes = [KeycloakIsAuthenticated]
+
+    @swagger_auto_schema()
+    def list(self, request: Request):
+        '''
+        获取所有角色
+        '''
+        res = KeycloakRoleController.get_client_roles()
         return Response(res)
+
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'role_name': openapi.Schema(type=openapi.TYPE_STRING, description='User username'),
+            },
+            required=['role_name']
+        ),
+    )
+    def create(self, request):
+        '''
+        创建角色
+        '''
+        role_name = request.data.get('role_name', None)
+        if role_name is None:
+            return Response({"error": "rolename is not present"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            role = KeycloakRoleController.create_client_role_and_policy(role_name)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(role, status=status.HTTP_201_CREATED)
+
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter('role_name', openapi.IN_PATH, description="Role name", type=openapi.TYPE_STRING)
+        ]
+    )
+    def destroy(self, request: Request, pk: str):
+        """
+        删除角色
+        """
+        try:
+            KeycloakRoleController.delete_role(pk)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'id': pk}, status=status.HTTP_200_OK)
+
+
+
+
+
 
 
 class UserManageViewSet(ModelViewSet):
@@ -603,7 +644,7 @@ class UserManageViewSet(ModelViewSet):
                 'email': openapi.Schema(type=openapi.TYPE_STRING, description='User email'),
                 'password': openapi.Schema(type=openapi.TYPE_STRING, description='User password'),
             },
-            required=['username', 'display_name' , 'password']
+            required=['username', 'display_name', 'password']
         ),
     )
     @delete_cache_key_decorator(USER_CACHE_KEY)
@@ -644,7 +685,7 @@ class UserManageViewSet(ModelViewSet):
         修改用户,username不可更改
         """
         if request.data.get('username', None) is not None:
-            return Response({'error':'username cannot be changed'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'username cannot be changed'}, status=status.HTTP_400_BAD_REQUEST)
         res = UserController.update_user_controller(**{"request": request, "self": self, "manage_api": self.manage_api})
         return Response(**res)
 
@@ -670,14 +711,14 @@ class UserManageViewSet(ModelViewSet):
         if id is None or password is None:
             return Response({'error': 'is or password are not present'}, status=status.HTTP_400_BAD_REQUEST)
         sys_user = SysUser.objects.get(pk=int(id))
-        kc_user = KeyCloakUserController.get_user_by_name(sys_user.bk_username, request.auth)
+        kc_user = KeycloakUserController.get_user_by_name(sys_user.bk_username, request.auth)
         if kc_user is None:
-            return Response({'error':'user not found'}, status=status.HTTP_404_NOT_FOUND)
-        KeyCloakUserController.reset_password(kc_user['id'], password, request.auth)
+            return Response({'error': 'user not found'}, status=status.HTTP_404_NOT_FOUND)
+        KeycloakUserController.reset_password(kc_user['id'], password, request.auth)
         # res = UserController.reset_user_password_controller(
         #     **{"request": request, "self": self, "manage_api": self.manage_api}
         # )
-        return Response({'message':'success'})
+        return Response({'message': 'success'})
 
     @swagger_auto_schema(
         manual_parameters=[

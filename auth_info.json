@@ -3,24 +3,43 @@
   "policyEnforcementMode": "ENFORCING",
   "resources": [
     {
-      "name": "Default Resource",
-      "type": "urn:weops_lite:resources:default",
+      "name": "users_view",
+      "type": "user",
       "ownerManagedAccess": false,
+      "displayName": "查询用户",
       "attributes": {},
-      "_id": "8228dc93-f1ee-41f1-97b8-9095267a9b30",
-      "uris": [
-        "/*"
-      ]
+      "_id": "9c4ca72d-5520-4cd8-87a1-ef896144749e",
+      "uris": [],
+      "icon_uri": ""
     },
     {
-      "name": "user_management",
+      "name": "users_create",
+      "type": "user",
       "ownerManagedAccess": false,
-      "displayName": "",
+      "displayName": "创建用户",
       "attributes": {},
-      "_id": "cc698101-935f-40b5-94ff-e46d71b69b37",
-      "uris": [
-        "/system/mgmt/user_manage/*"
-      ],
+      "_id": "a456585f-7f53-40f2-867f-f439f5f1a0d4",
+      "uris": [],
+      "icon_uri": ""
+    },
+    {
+      "name": "users_edit",
+      "type": "user",
+      "ownerManagedAccess": false,
+      "displayName": "编辑用户",
+      "attributes": {},
+      "_id": "e533d68a-9aee-4f66-a1f8-1068958a8c1f",
+      "uris": [],
+      "icon_uri": ""
+    },
+    {
+      "name": "users_delete",
+      "type": "user",
+      "ownerManagedAccess": false,
+      "displayName": "删除用户",
+      "attributes": {},
+      "_id": "15f893a3-5c4a-417e-aab7-e5f74048f0cb",
+      "uris": [],
       "icon_uri": ""
     }
   ],
@@ -37,25 +56,25 @@
       }
     },
     {
-      "id": "72cbfd92-2d43-4c72-bd11-bb9e812757b7",
-      "name": "normal_role_policy",
-      "description": "普通角色规则",
-      "type": "role",
-      "logic": "POSITIVE",
-      "decisionStrategy": "UNANIMOUS",
-      "config": {
-        "roles": "[{\"id\":\"normal\",\"required\":true}]"
-      }
-    },
-    {
-      "id": "ba96b085-3ed9-4be1-b260-4d6e23c270b7",
-      "name": "admin_role_policy",
+      "id": "9b8721f4-2fb7-450e-aa7f-200e9a305876",
+      "name": "normal",
       "description": "",
       "type": "role",
       "logic": "POSITIVE",
       "decisionStrategy": "UNANIMOUS",
       "config": {
-        "roles": "[{\"id\":\"admin\",\"required\":true}]"
+        "roles": "[{\"id\":\"weops_lite/normal\",\"required\":true}]"
+      }
+    },
+    {
+      "id": "7ff8ec53-35e6-4756-a150-0877f4021ad4",
+      "name": "admin",
+      "description": "",
+      "type": "role",
+      "logic": "POSITIVE",
+      "decisionStrategy": "UNANIMOUS",
+      "config": {
+        "roles": "[{\"id\":\"weops_lite/admin\",\"required\":true}]"
       }
     },
     {
@@ -71,30 +90,54 @@
       }
     },
     {
-      "id": "7fa88d2a-61fd-413e-8822-09847cc6927a",
-      "name": "user_management_view",
+      "id": "8ecb9e5f-e692-46cc-b4ba-0053b59a8ecc",
+      "name": "users_view",
       "description": "",
       "type": "resource",
       "logic": "POSITIVE",
       "decisionStrategy": "AFFIRMATIVE",
       "config": {
-        "defaultResourceType": "",
-        "resources": "[\"user_management\"]",
-        "applyPolicies": "[\"normal_role_policy\",\"admin_role_policy\"]"
+        "resources": "[\"users_view\"]",
+        "applyPolicies": "[\"admin\",\"normal\"]"
       }
     },
     {
-      "id": "e93c28fa-0804-425f-aba1-71784e123dba",
-      "name": "user_management_operation",
+      "id": "ddf25fb9-f7e4-4671-a1a7-6ce1095fbf83",
+      "name": "users_edit",
       "description": "",
       "type": "resource",
       "logic": "POSITIVE",
-      "decisionStrategy": "UNANIMOUS",
+      "decisionStrategy": "AFFIRMATIVE",
       "config": {
-        "resources": "[\"user_management\"]",
-        "applyPolicies": "[\"admin_role_policy\"]"
+        "resources": "[\"users_edit\"]",
+        "applyPolicies": "[\"admin\",\"normal\"]"
+      }
+    },
+    {
+      "id": "12c24a52-16bb-47d0-a645-a88988db4a6e",
+      "name": "users_delete",
+      "description": "",
+      "type": "resource",
+      "logic": "POSITIVE",
+      "decisionStrategy": "AFFIRMATIVE",
+      "config": {
+        "resources": "[\"users_delete\"]",
+        "applyPolicies": "[\"admin\"]"
+      }
+    },
+    {
+      "id": "fdb5a0f8-420a-4ea5-a0d4-a858c1612a68",
+      "name": "users_create",
+      "description": "",
+      "type": "resource",
+      "logic": "POSITIVE",
+      "decisionStrategy": "AFFIRMATIVE",
+      "config": {
+        "resources": "[\"users_create\"]",
+        "applyPolicies": "[\"admin\"]"
       }
     }
   ],
+  "scopes": [],
   "decisionStrategy": "UNANIMOUS"
 }
