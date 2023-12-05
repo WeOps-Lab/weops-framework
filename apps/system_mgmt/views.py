@@ -68,7 +68,8 @@ from apps.system_mgmt.serializers import (
 )
 from apps.system_mgmt.user_manages import UserManageApi
 from apps.system_mgmt.utils import UserUtils
-from apps.system_mgmt.utils_package.controller import RoleController, UserController, KeycloakUserController, KeycloakRoleController, KeycloakPermissionController
+from apps.system_mgmt.utils_package.controller import RoleController, UserController, KeycloakUserController, \
+    KeycloakRoleController, KeycloakPermissionController
 from apps.system_mgmt.utils_package.inst_permissions import InstPermissionsUtils
 from blueapps.account.components.weixin.weixin_utils import WechatUtils
 from blueapps.account.decorators import login_exempt
@@ -169,7 +170,8 @@ def open_set_user_roles(request, *args, **kwargs):
 
 
 class LogoViewSet(RetrieveModelMixin, UpdateModelMixin, GenericViewSet):
-    permission_classes = [IsAuthenticated, ManagerPermission]
+    authentication_classes = [KeycloakTokenAuthentication]
+    permission_classes = [KeycloakIsAuthenticated]
     queryset = SysSetting.objects.all()
     serializer_class = LogSerializer
 
@@ -416,7 +418,6 @@ class KeyCloakLoginView(views.APIView):
 
 
 class KeyCloakUserViewSet(viewsets.ViewSet):
-
     authentication_classes = [KeycloakTokenAuthentication]
     permission_classes = [KeycloakIsAuthenticated]
 
@@ -430,9 +431,22 @@ class KeyCloakUserViewSet(viewsets.ViewSet):
     def list(self, request: Request):
         page = request.query_params.get("page", 1)  # 获取请求中的页码参数，默认为第一页
         per_page = request.query_params.get("per_page", 10)  # 获取请求中的每页结果数，默认为10
-        # bk_token = request.COOKIES.get('bk_token', None)
         res = KeycloakUserController.get_user_list(**{"page": int(page), "per_page": int(per_page)
             , "search": request.query_params.get('search', None)})
+        return Response(res)
+
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter('page', in_=openapi.IN_QUERY, type=openapi.TYPE_INTEGER),
+            openapi.Parameter('per_page', in_=openapi.IN_QUERY, type=openapi.TYPE_INTEGER)
+        ],
+        operation_description='获取该角色下的所有用户'
+    )
+    @action(detail=False, methods=['get'], url_path='roles/(?P<role_id>[^/.]+)')
+    def get_users_in_role(self, request: Request, role_id: str):
+        page = request.query_params.get("page", 1)  # 获取请求中的页码参数，默认为第一页
+        per_page = request.query_params.get("per_page", 10)  # 获取请求中的每页结果数，默认为10
+        res = KeycloakUserController.get_user_in_role(role_id, page, per_page)
         return Response(res)
 
     @swagger_auto_schema(
@@ -499,7 +513,7 @@ class KeyCloakUserViewSet(viewsets.ViewSet):
         """
         payload = dict()
         for k in request.data.keys():
-                payload[k] = request.data[k]
+            payload[k] = request.data[k]
         try:
             KeycloakUserController.update_user(**{"user_id": pk, "payload": payload})
         except Exception as e:
@@ -530,8 +544,8 @@ class KeyCloakUserViewSet(viewsets.ViewSet):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'id': pk}, status=status.HTTP_200_OK)
 
-class KeyCloakRoleViewSet(viewsets.ViewSet):
 
+class KeyCloakRoleViewSet(viewsets.ViewSet):
     authentication_classes = [KeycloakTokenAuthentication]
     permission_classes = [KeycloakIsAuthenticated]
 
@@ -565,11 +579,7 @@ class KeyCloakRoleViewSet(viewsets.ViewSet):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(role, status=status.HTTP_201_CREATED)
 
-    @swagger_auto_schema(
-        manual_parameters=[
-            openapi.Parameter('role_name', openapi.IN_PATH, description="Role name", type=openapi.TYPE_STRING)
-        ]
-    )
+    @swagger_auto_schema()
     def destroy(self, request: Request, pk: str):
         """
         删除角色
@@ -578,12 +588,61 @@ class KeyCloakRoleViewSet(viewsets.ViewSet):
             KeycloakRoleController.delete_role(pk)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response({'id': pk}, status=status.HTTP_200_OK)
+        return Response({'role_id': pk}, status=status.HTTP_200_OK)
+
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter('permission_id', openapi.IN_PATH, description="permission ID", type=openapi.TYPE_STRING),
+        ],
+        operation_description='更改角色的权限状态，如果有切换为有，反之'
+    )
+    @action(detail=True, methods=['patch'], url_path='permissions/(?P<permission_id>[^/.]+)')
+    def ch_permission(self, request: Request, pk: str, permission_id: str):
+        try:
+            return Response(KeycloakRoleController.ch_permission_role(pk, permission_id))
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter('user_id', openapi.IN_PATH, description="user ID", type=openapi.TYPE_STRING),
+        ],
+        operation_description='将一个用户添加到角色'
+    )
+    @action(detail=True, methods=['put'], url_path='assign/(?P<user_id>[^/.]+)')
+    def assign_role(self, request: Request, pk: str, user_id: str):
+        try:
+            return Response(KeycloakRoleController.assign_role_users(pk, user_id))
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter('user_id', openapi.IN_PATH, description="user ID", type=openapi.TYPE_STRING),
+        ],
+        operation_description='将一个用户从角色移除'
+    )
+    @action(detail=True, methods=['delete'], url_path='withdraw/(?P<user_id>[^/.]+)')
+    def withdraw_role(self, request: Request, pk: str, user_id: str):
+        try:
+            return Response(KeycloakRoleController.remove_role_users(pk, user_id))
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class KeyCloakPermissionViewSet(viewsets.ViewSet):
+    authentication_classes = [KeycloakTokenAuthentication]
+    permission_classes = [KeycloakIsAuthenticated]
 
-
-
+    @swagger_auto_schema()
+    def list(self, request: Request):
+        """
+        基于该token获取所有权限，以及该用户是否拥有该权限
+        """
+        try:
+            return Response(KeycloakPermissionController.get_permissions(request.auth))
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UserManageViewSet(ModelViewSet):

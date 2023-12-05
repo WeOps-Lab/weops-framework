@@ -88,11 +88,11 @@ class KeycloakUtils:
               f'authz/resource-server/permission/resource/{permission_id}'
         headers = {
             "Content-Type": "application/json",
-            "Authoritarian": f"Bearer {self.__admin_token}"
+            "Authorization": f"Bearer {self.__admin_token}"
         }
         response = requests.put(url, json=payload, headers=headers)
-        if response.status_code / 100 == 2:
-            return str({'code':response.status_code, 'msg':response.content})
+        if int(response.status_code / 100) == 2:
+            return response.content
         else:
             raise Exception(str({'code':response.status_code, 'msg':response.content}))
 
@@ -107,10 +107,10 @@ class KeycloakUtils:
               f'authz/resource-server/policy/{permission_id}/resources'
         headers = {
             "Content-Type": "application/json",
-            "Authoritarian": f"Bearer {self.__admin_token}"
+            "Authorization": f"Bearer {self.__admin_token}"
         }
         response = requests.get(url, headers=headers)
-        if response.status_code / 100 == 2:
+        if int(response.status_code / 100) == 2:
             return response.json()
         else:
             raise Exception(str({'code': response.status_code, 'msg': response.content}))
@@ -136,10 +136,102 @@ class KeycloakUtils:
               f'authz/resource-server/policy/{permission_id}/associatedPolicies'
         headers = {
             "Content-Type": "application/json",
-            "Authoritarian": f"Bearer {self.__admin_token}"
+            "Authorization": f"Bearer {self.__admin_token}"
         }
         response = requests.get(url, headers=headers)
-        if response.status_code / 100 == 2:
+        if int(response.status_code / 100) == 2:
             return response.json()
+        else:
+            raise Exception(str({'code': response.status_code, 'msg': response.content}))
+
+    def get_permission_by_policy(self, policy_id: str):
+        '''
+        response like
+        [
+            {
+                "id": "8ecb9e5f-e692-46cc-b4ba-0053b59a8ecc",
+                "name": "users_view",
+                "type": "resource",
+                "logic": "POSITIVE",
+                "decisionStrategy": "UNANIMOUS",
+                "config": {}
+            },
+            {
+                "id": "ddf25fb9-f7e4-4671-a1a7-6ce1095fbf83",
+                "name": "users_edit",
+                "type": "resource",
+                "logic": "POSITIVE",
+                "decisionStrategy": "UNANIMOUS",
+                "config": {}
+            }
+        ]
+        '''
+        url = f'http://{self.__settings.KEYCLOAK_SETTINGS["HOST"]}:{self.__settings.KEYCLOAK_SETTINGS["PORT"]}/' \
+              f'admin/realms/{self.__settings.KEYCLOAK_SETTINGS["REALM_NAME"]}/clients/{self.__settings.KEYCLOAK_SETTINGS["ID_OF_CLIENT"]}/' \
+              f'authz/resource-server/policy/{policy_id}/dependentPolicies'
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.__admin_token}"
+        }
+        response = requests.get(url, headers=headers)
+        if int(response.status_code / 100) == 2:
+            return response.json()
+        else:
+            raise Exception(str({'code': response.status_code, 'msg': response.content}))
+
+    def get_users_in_role(self, role_name: str, params : dict):
+        '''
+        获取某角色中的所有用户
+        '''
+        url = f'http://{self.__settings.KEYCLOAK_SETTINGS["HOST"]}:{self.__settings.KEYCLOAK_SETTINGS["PORT"]}/' \
+              f'admin/realms/{self.__settings.KEYCLOAK_SETTINGS["REALM_NAME"]}/clients/{self.__settings.KEYCLOAK_SETTINGS["ID_OF_CLIENT"]}/' \
+              f'roles/{role_name}/users'
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.__admin_token}"
+        }
+        response = requests.get(url, headers=headers, params=params)
+        if int(response.status_code / 100) == 2:
+            return response.json()
+        else:
+            raise Exception(str({'code': response.status_code, 'msg': response.content}))
+
+    def get_role_by_id(self, role_id: str):
+        '''
+        通过role id获取role
+        response like
+        {
+            "id": "85efb45a-a866-43ab-892a-85a6836ab1a7",
+            "name": "admin",
+            "description": "",
+            "composite": false,
+            "clientRole": true,
+            "containerId": "a72a5bed-8673-48e1-ac0a-97ba3c06c88f",
+            "attributes": {}
+        }
+        '''
+        url = f'http://{self.__settings.KEYCLOAK_SETTINGS["HOST"]}:{self.__settings.KEYCLOAK_SETTINGS["PORT"]}/' \
+              f'admin/realms/{self.__settings.KEYCLOAK_SETTINGS["REALM_NAME"]}/' \
+              f'roles-by-id/{role_id}'
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.__admin_token}"
+        }
+        response = requests.get(url, headers=headers)
+        if int(response.status_code / 100) == 2:
+            return response.json()
+        else:
+            raise Exception(str({'code': response.status_code, 'msg': response.content}))
+
+    def delete_client_role_by_id(self, role_id: str):
+        url = f'http://{self.__settings.KEYCLOAK_SETTINGS["HOST"]}:{self.__settings.KEYCLOAK_SETTINGS["PORT"]}/' \
+              f'admin/realms/{self.__settings.KEYCLOAK_SETTINGS["REALM_NAME"]}/roles-by-id/{role_id}'
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.__admin_token}"
+        }
+        response = requests.delete(url, headers=headers)
+        if int(response.status_code / 100) == 2:
+            return response.content
         else:
             raise Exception(str({'code': response.status_code, 'msg': response.content}))

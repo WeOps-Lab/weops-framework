@@ -34,5 +34,6 @@ urlpatterns = [
 router = DefaultRouter()
 router.register(r'users', views.KeyCloakUserViewSet, basename='user')
 router.register(r'roles', views.KeyCloakRoleViewSet, basename='role')
+router.register(r'permissions', views.KeyCloakPermissionViewSet, basename='permission')
 # 用户管理API
 urlpatterns.extend(router.urls)

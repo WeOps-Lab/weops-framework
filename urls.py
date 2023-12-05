@@ -105,18 +105,18 @@ router = SimpleRouter()
 # router.register(r"system/mgmt/user_manage", UserManageViewSet, basename="sys-user")
 
 # 3.5版本角色管理
-router.register(r"system/mgmt/role_manage", RoleManageViewSet, basename="sys-role")
-
-router.register(r"system/mgmt/menu_manage", MenuManageModelViewSet, basename="sys-menu")
-
-router.register(r"system/mgmt/inst_permissions", InstancesPermissionsModelViewSet, basename="sys-permissions")
+# router.register(r"system/mgmt/role_manage", RoleManageViewSet, basename="sys-role")
+#
+# router.register(r"system/mgmt/menu_manage", MenuManageModelViewSet, basename="sys-menu")
+#
+# router.register(r"system/mgmt/inst_permissions", InstancesPermissionsModelViewSet, basename="sys-permissions")
 
 # 系统用户操作
 # router.register(r"system/mgmt/sys_users", SysUserViewSet, basename="sys-user")
 # 系统操作日志
 router.register(r"system/mgmt/operation_log", OperationLogViewSet, basename="sys-log")
 # 系统配置
-router.register(r"system/mgmt/sys_setting", SysSettingViewSet, basename="sys-setting")
+# router.register(r"system/mgmt/sys_setting", SysSettingViewSet, basename="sys-setting")
 
 urlpatterns += router.urls
 

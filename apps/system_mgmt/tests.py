@@ -48,7 +48,7 @@ class PythonKeycloakTest(unittest.TestCase):
         policies = self.keycloak_openid.get_policies(self.token['access_token'], method_token_info='decode',
                                                 key=KEYCLOAK_PUBLIC_KEY, options=options)
         permissions = self.keycloak_openid.get_permissions(self.token['access_token'], method_token_info='introspect')
-        all_p = self.keycloak_admin.get_client_authz_permissions(self.id_of_client)
+        # all_p = self.keycloak_admin.get_client_authz_permissions(self.id_of_client)
         # 获取所有有权限的资源名
         permissions = self.keycloak_openid.uma_permissions(self.token['access_token'])
         # 填入资源名，有权限有返回，没有权限返回403 exception
