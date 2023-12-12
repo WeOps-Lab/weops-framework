@@ -25,3 +25,4 @@ class SystemManagementConfig(AppConfig):
 
         post_migrate.connect(post_migrate_init, sender=self)
 
+        # TODO 初始化keycloak

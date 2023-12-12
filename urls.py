@@ -29,7 +29,7 @@ from apps.system_mgmt.views import (
     SysSettingViewSet,
     SysUserViewSet,
     UserManageViewSet,
-    KeyCloakUserViewSet,
+    KeycloakUserViewSet,
 )
 
 urlpatterns = [
@@ -107,7 +107,7 @@ router = SimpleRouter()
 # 3.5版本角色管理
 # router.register(r"system/mgmt/role_manage", RoleManageViewSet, basename="sys-role")
 #
-# router.register(r"system/mgmt/menu_manage", MenuManageModelViewSet, basename="sys-menu")
+router.register(r"system/mgmt/menu_manage", MenuManageModelViewSet, basename="sys-menu")
 #
 # router.register(r"system/mgmt/inst_permissions", InstancesPermissionsModelViewSet, basename="sys-permissions")
 

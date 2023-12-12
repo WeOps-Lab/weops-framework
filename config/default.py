@@ -94,8 +94,7 @@ KEYCLOAK_SETTINGS = {
     "ID_OF_CLIENT" :  os.environ.get("BKAPP_ID_OF_CLIENT", "a72a5bed-8673-48e1-ac0a-97ba3c06c88f"),
     "CLIENT_SECRET_KEY" : os.environ.get("BKAPP_CLIENT_SECRET_KEY", "UQym8RIjp4X4hxMxIkL1hOktVU1auDa3"),
     "ADMIN_USERNAME" : os.environ.get("BKAPP_ADMIN_USERNAME", "admin"),
-    "ADMIN_PASSWORD" : os.environ.get("BKAPP_ADMIN_USERNAME", "admin"),
-    "AUTH_INFO_FILE_PATH" : os.environ.get("BKAPP_ADMIN_USERNAME", "auth_info.json"),
+    "ADMIN_PASSWORD" : os.environ.get("BKAPP_ADMIN_USERNAME", "admin")
 }
 
 
@@ -273,7 +272,7 @@ REST_FRAMEWORK = {
     # "EXCEPTION_HANDLER": "utils.exception_capture.common_exception_handler",
 }
 if LOGIN_METHOD == 'keycloak':
-    REST_FRAMEWORK['DEFAULT_AUTHENTICATION_CLASSES'] = ('apps.system_mgmt.KeycloakTokenAuthentication'
+    REST_FRAMEWORK['DEFAULT_AUTHENTICATION_CLASSES'] = ('apps.system_mgmt.utils_package.KeycloakTokenAuthentication'
                                                         '.KeycloakTokenAuthentication',)
 
 HAYSTACK_CONNECTIONS = {

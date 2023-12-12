@@ -41,9 +41,11 @@ class PythonKeycloakTest(unittest.TestCase):
 
     def test_method(self):
         userinfo = self.keycloak_openid.userinfo(self.token['access_token'])
+        tokeninfo = self.keycloak_openid.introspect(self.token['access_token'])
         print(userinfo)
         KEYCLOAK_PUBLIC_KEY = "-----BEGIN PUBLIC KEY-----\n" + self.keycloak_openid.public_key() + "\n-----END PUBLIC KEY-----"
         options = {"verify_signature": True, "verify_aud": False, "verify_exp": True}
+        decoded = self.keycloak_openid.decode_token(self.token['access_token'], key=KEYCLOAK_PUBLIC_KEY, options=options)
         self.keycloak_openid.load_authorization_config(r"D:\Projectes\weops-framework\auth_info.json")
         policies = self.keycloak_openid.get_policies(self.token['access_token'], method_token_info='decode',
                                                 key=KEYCLOAK_PUBLIC_KEY, options=options)

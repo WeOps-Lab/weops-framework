@@ -12,26 +12,22 @@ specific language governing permissions and limitations under the License.
 """
 import hashlib
 import json
-import logging
 import os
 import random
 import re
 import string
 import time
 
-import requests
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Q, QuerySet
 from django.db.transaction import atomic
 from django.http import JsonResponse
-from django.http import HttpResponseBadRequest
 from rest_framework.request import Request
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
-from keycloak import KeycloakOpenID, KeycloakOpenIDConnection, KeycloakAdmin
 
 # 开发框架中通过中间件默认是需要登录态的，如有不需要登录的，可添加装饰器login_exempt
 # 装饰器引入 from blueapps.account.decorators import login_exempt
@@ -39,12 +35,11 @@ from rest_framework.decorators import action
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateModelMixin
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 from django.apps import apps
 from apps.system_mgmt import constants as system_constants
-from apps.system_mgmt.KeycloakTokenAuthentication import KeycloakTokenAuthentication
-from apps.system_mgmt.KeycloakIsAutenticated import KeycloakIsAuthenticated
+from apps.system_mgmt.utils_package.KeycloakTokenAuthentication import KeycloakTokenAuthentication
+from apps.system_mgmt.utils_package.KeycloakIsAutenticated import KeycloakIsAuthenticated
 from apps.system_mgmt.casbin_package.permissions import ManagerPermission, get_user_roles
 from apps.system_mgmt.constants import DB_APPS, DB_MENU_IDS, MENUS_MAPPING
 from apps.system_mgmt.filters import (
@@ -83,6 +78,7 @@ from utils.app_log import logger
 
 from utils.decorators import ApiLog, delete_cache_key_decorator
 from utils.usermgmt_sql_utils import UsermgmtSQLUtils
+from apps.system_mgmt.utils_package.CheckKeycloakPermission import check_keycloak_permission
 
 
 @login_exempt
@@ -182,11 +178,12 @@ class LogoViewSet(RetrieveModelMixin, UpdateModelMixin, GenericViewSet):
         )
         return obj
 
-    def get_permissions(self):
-        if self.action == "retrieve":
-            self.permission_classes = [IsAuthenticated]
-        return super().get_permissions()
+    # def get_permissions(self):
+    #     if self.action == "retrieve":
+    #         self.permission_classes = [IsAuthenticated]
+    #     return super().get_permissions()
 
+    @check_keycloak_permission('SysSetting_logo_change')
     def update(self, request, *args, **kwargs):
         file_obj = request.FILES.get("file", "")
         instance = self.get_object()
@@ -197,7 +194,7 @@ class LogoViewSet(RetrieveModelMixin, UpdateModelMixin, GenericViewSet):
         self.perform_update(serializer)
         current_ip = getattr(request, "current_ip", "127.0.0.1")
         OperationLog.objects.create(
-            operator=request.user.username,
+            operator=request.user.get('username', None),
             operate_type=OperationLog.MODIFY,
             operate_obj="Logo设置",
             operate_summary="修改Logo为:[{}]".format(file_obj.name if file_obj else ""),
@@ -207,6 +204,7 @@ class LogoViewSet(RetrieveModelMixin, UpdateModelMixin, GenericViewSet):
         )
         return Response(serializer.data)
 
+    @check_keycloak_permission('SysSetting_logo_change')
     def reset(self, request, *args, **kwargs):
         instance = self.get_object()
         instance.value = system_constants.SYSTEM_LOGO_INFO["value"]
@@ -214,7 +212,7 @@ class LogoViewSet(RetrieveModelMixin, UpdateModelMixin, GenericViewSet):
         serializer = self.get_serializer(instance)
         current_ip = getattr(request, "current_ip", "127.0.0.1")
         OperationLog.objects.create(
-            operator=request.user.username,
+            operator=request.user.get('username', None),
             operate_type=OperationLog.MODIFY,
             operate_obj="Logo设置",
             operate_summary="logo恢复默认",
@@ -271,7 +269,8 @@ class SysUserViewSet(ModelViewSet):
 
 
 class OperationLogViewSet(ListModelMixin, GenericViewSet):
-    permission_classes = [IsAuthenticated]
+    authentication_classes = [KeycloakTokenAuthentication]
+    permission_classes = [KeycloakIsAuthenticated]
     queryset = OperationLog.objects.all()
     serializer_class = OperationLogSer
     ordering_fields = ["created_at"]
@@ -379,11 +378,9 @@ class SysSettingViewSet(ModelViewSet):
 
 from rest_framework import viewsets
 from rest_framework import views, status
-from django.contrib.auth import get_user_model
-from rest_framework.authtoken.models import Token
 
 
-class KeyCloakLoginView(views.APIView):
+class KeycloakLoginView(views.APIView):
     '''
     该类用作验证登录
     '''
@@ -417,7 +414,7 @@ class KeyCloakLoginView(views.APIView):
             return Response({'token': token}, status=status.HTTP_200_OK)
 
 
-class KeyCloakUserViewSet(viewsets.ViewSet):
+class KeycloakUserViewSet(viewsets.ViewSet):
     authentication_classes = [KeycloakTokenAuthentication]
     permission_classes = [KeycloakIsAuthenticated]
 
@@ -428,6 +425,7 @@ class KeyCloakUserViewSet(viewsets.ViewSet):
             openapi.Parameter('search', in_=openapi.IN_QUERY, type=openapi.TYPE_STRING),
         ]
     )
+    @check_keycloak_permission('SysUser_view')
     def list(self, request: Request):
         page = request.query_params.get("page", 1)  # 获取请求中的页码参数，默认为第一页
         per_page = request.query_params.get("per_page", 10)  # 获取请求中的每页结果数，默认为10
@@ -443,6 +441,7 @@ class KeyCloakUserViewSet(viewsets.ViewSet):
         operation_description='获取该角色下的所有用户'
     )
     @action(detail=False, methods=['get'], url_path='roles/(?P<role_id>[^/.]+)')
+    @check_keycloak_permission('SysRole_users_manage')
     def get_users_in_role(self, request: Request, role_id: str):
         page = request.query_params.get("page", 1)  # 获取请求中的页码参数，默认为第一页
         per_page = request.query_params.get("per_page", 10)  # 获取请求中的每页结果数，默认为10
@@ -461,6 +460,7 @@ class KeyCloakUserViewSet(viewsets.ViewSet):
             required=['username', 'password']
         ),
     )
+    @check_keycloak_permission('SysUser_create')
     def create(self, request):
         user = dict()
         username = request.data.get('username', None)
@@ -483,6 +483,7 @@ class KeyCloakUserViewSet(viewsets.ViewSet):
             openapi.Parameter('id', openapi.IN_PATH, description="User ID", type=openapi.TYPE_STRING)
         ]
     )
+    @check_keycloak_permission('SysUser_delete')
     def destroy(self, request: Request, pk: str):
         """
         删除用户
@@ -507,6 +508,7 @@ class KeyCloakUserViewSet(viewsets.ViewSet):
             }
         )
     )
+    @check_keycloak_permission('SysUser_edit', check_user_itself=False)
     def update(self, request: Request, pk: str):
         """
         修改用户信息
@@ -531,6 +533,7 @@ class KeyCloakUserViewSet(viewsets.ViewSet):
             }
         ),
     )
+    @check_keycloak_permission('SysUser_edit', check_user_itself=False)
     def partial_update(self, request: Request, pk: str):
         """
         重置用户密码
@@ -544,42 +547,62 @@ class KeyCloakUserViewSet(viewsets.ViewSet):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'id': pk}, status=status.HTTP_200_OK)
 
+    def ch_self_pwd(self, request: Request):
+        """
+        更改用户自己的密码
+        """
+        pass
 
-class KeyCloakRoleViewSet(viewsets.ViewSet):
+
+class KeycloakRoleViewSet(viewsets.ViewSet):
     authentication_classes = [KeycloakTokenAuthentication]
     permission_classes = [KeycloakIsAuthenticated]
 
     @swagger_auto_schema()
+    @check_keycloak_permission('SysRole_view')
     def list(self, request: Request):
         '''
         获取所有角色
         '''
         res = KeycloakRoleController.get_client_roles()
+        return Response(res)\
+
+    @swagger_auto_schema()
+    @check_keycloak_permission('SysRole_view')
+    def retrieve(self, request: Request, pk: str):
+        '''
+        获取指定角色，以及其拥有的权限
+        '''
+        res = KeycloakRoleController.get_client_roles_permissions_by_id(pk)
         return Response(res)
 
     @swagger_auto_schema(
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             properties={
-                'role_name': openapi.Schema(type=openapi.TYPE_STRING, description='User username'),
+                'role_name': openapi.Schema(type=openapi.TYPE_STRING, description='Role name'),
+                'description': openapi.Schema(type=openapi.TYPE_STRING, description='description'),
             },
             required=['role_name']
         ),
     )
+    @check_keycloak_permission('SysRole_create')
     def create(self, request):
         '''
         创建角色
         '''
         role_name = request.data.get('role_name', None)
-        if role_name is None:
-            return Response({"error": "rolename is not present"}, status=status.HTTP_400_BAD_REQUEST)
+        des = request.data.get('description', None)
+        if not role_name or not des:
+            return Response({"error": "rolename or description is not present"}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            role = KeycloakRoleController.create_client_role_and_policy(role_name)
+            role = KeycloakRoleController.create_client_role_and_policy(role_name, des)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(role, status=status.HTTP_201_CREATED)
 
     @swagger_auto_schema()
+    @check_keycloak_permission('SysRole_delete')
     def destroy(self, request: Request, pk: str):
         """
         删除角色
@@ -591,15 +614,18 @@ class KeyCloakRoleViewSet(viewsets.ViewSet):
         return Response({'role_id': pk}, status=status.HTTP_200_OK)
 
     @swagger_auto_schema(
-        manual_parameters=[
-            openapi.Parameter('permission_id', openapi.IN_PATH, description="permission ID", type=openapi.TYPE_STRING),
-        ],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_ARRAY,
+            items={'type': 'string'}
+        ),
         operation_description='更改角色的权限状态，如果有切换为有，反之'
     )
-    @action(detail=True, methods=['patch'], url_path='permissions/(?P<permission_id>[^/.]+)')
-    def ch_permission(self, request: Request, pk: str, permission_id: str):
+    @action(detail=True, methods=['patch'], url_path='permissions')
+    @check_keycloak_permission('SysRole_permissions')
+    def ch_permission(self, request: Request, pk: str):
         try:
-            return Response(KeycloakRoleController.ch_permission_role(pk, permission_id))
+            permission_ids = request.data
+            return Response(KeycloakRoleController.ch_permission_role(pk, permission_ids))
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -610,6 +636,7 @@ class KeyCloakRoleViewSet(viewsets.ViewSet):
         operation_description='将一个用户添加到角色'
     )
     @action(detail=True, methods=['put'], url_path='assign/(?P<user_id>[^/.]+)')
+    @check_keycloak_permission('SysRole_users_manage')
     def assign_role(self, request: Request, pk: str, user_id: str):
         try:
             return Response(KeycloakRoleController.assign_role_users(pk, user_id))
@@ -623,14 +650,39 @@ class KeyCloakRoleViewSet(viewsets.ViewSet):
         operation_description='将一个用户从角色移除'
     )
     @action(detail=True, methods=['delete'], url_path='withdraw/(?P<user_id>[^/.]+)')
+    @check_keycloak_permission('SysRole_users_manage')
     def withdraw_role(self, request: Request, pk: str, user_id: str):
         try:
             return Response(KeycloakRoleController.remove_role_users(pk, user_id))
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter('id', openapi.IN_PATH, description="User ID", type=openapi.TYPE_STRING)
+        ],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'description': openapi.Schema(type=openapi.TYPE_STRING, description='Role description')
+            }
+        )
+    )
+    @check_keycloak_permission('SysRole_edit')
+    def update(self, request: Request, pk: str):
+        des = request.data.get('description', None)
+        if not des:
+            return Response({'error': 'description needed'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            KeycloakRoleController.edit_role(pk, des)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({'id': pk}, status=status.HTTP_200_OK)
 
-class KeyCloakPermissionViewSet(viewsets.ViewSet):
+
+
+
+class KeycloakPermissionViewSet(viewsets.ViewSet):
     authentication_classes = [KeycloakTokenAuthentication]
     permission_classes = [KeycloakIsAuthenticated]
 
@@ -1028,7 +1080,8 @@ class MenuManageModelViewSet(ModelViewSet):
     自定义菜单管理
     """
 
-    permission_classes = [IsAuthenticated]
+    authentication_classes = [KeycloakTokenAuthentication]
+    permission_classes = [KeycloakIsAuthenticated]
     queryset = MenuManage.objects.all()
     serializer_class = MenuManageModelSerializer
     ordering = ["created_at"]
@@ -1112,7 +1165,7 @@ class MenuManageModelViewSet(ModelViewSet):
         instance.use = True
         instance.save()
         OperationLog.objects.create(
-            operator=request.user.username,
+            operator=request.user.get('username', None),
             operate_type=OperationLog.MODIFY,
             operate_obj=instance.menu_name,
             operate_summary="自定义菜单管理启用自定义菜单:[{}]".format(instance.menu_name),
@@ -1359,55 +1412,112 @@ def generate_validate_code():
 
 
 class LoginInfoView(views.APIView):
+
     authentication_classes = [KeycloakTokenAuthentication]
     permission_classes = [KeycloakIsAuthenticated]
 
     def get(self, request: Request) -> Response:
-        pattern = re.compile(r"weops_saas[-_]+[vV]?([\d.]*)")
-        version = [i.strip() for i in pattern.findall(os.getenv("FILE_NAME", "weops_saas-3.5.3.tar.gz")) if i.strip()]
-
-        user_super, _, user_menus, chname, operate_ids = get_user_roles(request.user)
-        notify_day = 30
-        expired_day = 365
-
-        app_list = apps.get_app_configs()
-        applications = []
-        for app in app_list:
-            if app.name.startswith("apps."):
-                app.name = app.name.replace("apps.", '')
-                applications.append(app.name)
-            elif app.name.startswith("apps_other."):
-                app.name = app.name.replace("apps_other.", '')
-                applications.append(app.name)
-
-        # 去重user_menus
-        user_menus = list(set(user_menus))
-        # 去重operate_ids
-        operate_ids = duplicate_removal_operate_ids(operate_ids)
-
-        # 启用的菜单
-        menu_instance = MenuManage.objects.filter(use=True).first()
-        weops_menu = menu_instance.menu if menu_instance else []
-
-        return Response(
-            {
-                "weops_menu": weops_menu,
-                "username": request.user.username,
-                "applications": applications or list(MENUS_MAPPING.keys()),  # weops有的权限
-                "is_super": user_super,
-                "menus": user_menus,
-                "chname": chname,
-                "operate_ids": operate_ids,
-                "role": request.user.role,
-                "last_login_addr": getattr(request.user, 'last_login_addr', None) or "",
-                # "last_login": request.user.last_login.strftime("%Y-%m-%d %H:%M"),
-                "last_login": getattr(request.user, 'last_login', None) or "",
-                "token": request.COOKIES.get("token", ""),
-                "version": version[0].strip(".") if version else "3.5.3",
-                "expired_day": expired_day,
-                "notify_day": notify_day,
-            }
-        )
+        # pattern = re.compile(r"weops_saas[-_]+[vV]?([\d.]*)")
+        # version = [i.strip() for i in pattern.findall(os.getenv("FILE_NAME", "weops_saas-3.5.3.tar.gz")) if i.strip()]
+        #
+        # user_super, _, user_menus, chname, operate_ids = get_user_roles(request.user)
+        # notify_day = 30
+        # expired_day = 365
+        #
+        # app_list = apps.get_app_configs()
+        # applications = []
+        # for app in app_list:
+        #     if app.name.startswith("apps."):
+        #         app.name = app.name.replace("apps.", '')
+        #         applications.append(app.name)
+        #     elif app.name.startswith("apps_other."):
+        #         app.name = app.name.replace("apps_other.", '')
+        #         applications.append(app.name)
+        #
+        # # 去重user_menus
+        # user_menus = list(set(user_menus))
+        # # 去重operate_ids
+        # operate_ids = duplicate_removal_operate_ids(operate_ids)
+        #
+        # # 启用的菜单
+        # menu_instance = MenuManage.objects.filter(use=True).first()
+        # weops_menu = menu_instance.menu if menu_instance else []
+        #
+        # return Response(
+        #     {
+        #         "weops_menu": weops_menu,
+        #         "username": request.user.username,
+        #         "applications": applications or list(MENUS_MAPPING.keys()),  # weops有的权限
+        #         "is_super": user_super,
+        #         "menus": user_menus,
+        #         "chname": chname,
+        #         "operate_ids": operate_ids,
+        #         "role": request.user.role,
+        #         "last_login_addr": getattr(request.user, 'last_login_addr', None) or "",
+        #         # "last_login": request.user.last_login.strftime("%Y-%m-%d %H:%M"),
+        #         "last_login": getattr(request.user, 'last_login', None) or "",
+        #         "token": request.COOKIES.get("token", ""),
+        #         "version": version[0].strip(".") if version else "3.5.3",
+        #         "expired_day": expired_day,
+        #         "notify_day": notify_day,
+        #     }
+        # )
+        is_super = False
+        try:
+            is_super = 'admin' in request.user['resource_access'][settings.KEYCLOAK_SETTINGS['CLIENT_ID']]['roles']
+        except Exception as e:
+            pass
+        permissions: dict = KeycloakPermissionController.get_permissions(request.auth)
+        # 根据拥有view权限的获取其菜单
+        menus = list()
+        # 根据权限划分菜单和操作，按格式返回
+        operate_ids = list()
+        for k, v in permissions.items():
+            operate_idss = list()
+            for p in v:
+                strs = p['name'].split('_')
+                if p['allow']:
+                    operate_idss.append(p['name'])
+                if strs[-1] == 'view' and p['allow']:
+                    menus.append(k)
+                    operate_ids.append({
+                        'operate_ids': operate_idss,
+                        'menuId': k
+                    })
+        # for menu in menus:
+        #     for p in permissions['menu']:
+        #         operate_idss = list
+        #         if p['allow']:
+        #             pass
+        return Response({
+            'username': request.user['username'],
+            'chname': request.user['name'],
+            'email': request.user['email'],
+            'token': request.auth,
+            'is_super': is_super,
+            'menus': menus,
+            'operate_ids': operate_ids,
+            'weops_menu':[],
+            'applications': [
+                "resource",
+                "big_screen",
+                "health_advisor",
+                "operational_tools",
+                "repository",
+                "senior_resource",
+                "itsm",
+                "patch_mgmt",
+                "auto_process",
+                "chat_ops",
+                "syslog",
+                "dashboard",
+                "custom_topology",
+                "monitor_mgmt",
+                "dashboard_senior",
+                "timed_job",
+                "apm"
+            ]
+        })
 
 
 def get_init_data():

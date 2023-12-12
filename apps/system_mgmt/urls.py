@@ -28,12 +28,12 @@ urlpatterns = [
     url(r"send_validate_code_exempt/$", views.send_validate_code_exempt),
     url(r"login_info/$", views.LoginInfoView.as_view()),
     # 用户登录
-    url(r"keycloak_login/$", views.KeyCloakLoginView.as_view()),
+    url(r"keycloak_login/$", views.KeycloakLoginView.as_view()),
 ]
 
 router = DefaultRouter()
-router.register(r'users', views.KeyCloakUserViewSet, basename='user')
-router.register(r'roles', views.KeyCloakRoleViewSet, basename='role')
-router.register(r'permissions', views.KeyCloakPermissionViewSet, basename='permission')
+router.register(r'users', views.KeycloakUserViewSet, basename='user')
+router.register(r'roles', views.KeycloakRoleViewSet, basename='role')
+router.register(r'permissions', views.KeycloakPermissionViewSet, basename='permission')
 # 用户管理API
 urlpatterns.extend(router.urls)

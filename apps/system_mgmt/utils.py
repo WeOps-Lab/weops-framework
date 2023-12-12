@@ -448,3 +448,10 @@ class InstPermissionsInitData(object):
                 logger.info("同步旧数据到casbin mesh. result={}".format(result))
         except Exception as err:
             logger.warning("初始化实例权限数据到casbin失败！error={}".format(err))
+
+def init_keycloak(**kwargs):
+    """
+    初始化keycloak
+    1. 创建client
+    2. 创建client role: admin 和 normal
+    """

@@ -35,7 +35,7 @@ class ApiLog(object):
                     params = getattr(request, "data", None).get("file").name
                 except Exception:
                     params = ""
-            user = request.user.username
+            user = request.user.get('username', None)
             ip = getattr(request, "current_ip", "")
             if not ip:
                 ip = get_client_ip(request)

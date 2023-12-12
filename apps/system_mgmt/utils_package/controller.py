@@ -8,6 +8,8 @@ import copy
 import json
 import logging
 import uuid
+from collections import defaultdict
+from datetime import datetime
 
 import requests
 from casbin_adapter.models import CasbinRule
@@ -981,29 +983,66 @@ class KeycloakRoleController:
     def get_client_roles(cls):
         """
         获取所有客户端角色，把默认的角色删除
+        无权限，权限去详情接口里找
         """
         roles = cls.keycloak_utils.get_keycloak_admin().get_client_roles(
             cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'], False)
         roles_dict = {r['name']: r for r in list(filter(lambda r: r['name'] != 'uma_protection', roles))}
         # 获取相关policy，并记录其id
-        policies = cls.keycloak_utils.get_keycloak_admin().get_client_authz_policies(cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
-        for policy in policies:
-            if policy['name'] in roles_dict:
-                roles_dict[policy['name']]['policy_id'] = policy['id']
-        # 根据policy id查出依赖的permission
-        for name, role in roles_dict.items():
-            permissions = cls.keycloak_utils.get_permission_by_policy(role['policy_id'])
-            role['permissions'] = permissions
+        # policies = cls.keycloak_utils.get_keycloak_admin().get_client_authz_policies(cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
+        # for policy in policies:
+        #     if policy['name'] in roles_dict:
+        #         roles_dict[policy['name']]['policy_id'] = policy['id']
+        # # 根据policy id查出依赖的permission
+        # for name, role in roles_dict.items():
+        #     permissions = cls.keycloak_utils.get_permission_by_policy(role['policy_id'])
+        #     role['permissions'] = permissions
         return list(roles_dict.values())
 
     @classmethod
-    def create_client_role_and_policy(cls, role_name: str):
+    def get_client_roles_permissions_by_id(cls, role_id: str):
+        """
+        根据角色id获取其详情以及其所拥有的权限
+        """
+        role = cls.keycloak_utils.get_role_by_id(role_id)
+        # 获取相关policy，并记录其id
+        policies = cls.keycloak_utils.get_keycloak_admin().get_client_authz_policies(cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
+        for policy in policies:
+            if policy['name'] == role['name']:
+                role['policy_id'] = policy['id']
+                break
+        # 获取所有permission
+        all_permissions = cls.keycloak_utils.get_keycloak_admin().get_client_authz_permissions(
+            cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
+        ps = [{'name': d['name'], 'des': d['description'], 'id': d['id'], 'allow': False} for d in all_permissions if
+              d['name'] != 'Default Permission']
+        ps = {p['name']: p for p in ps}
+        # 获取相关permissions
+        ac_permissions = cls.keycloak_utils.get_permission_by_policy(role['policy_id'])
+        for ac_p in ac_permissions:
+            ps[ac_p['name']]['allow'] = True
+        ps = ps.values()
+        # 为permissions分层
+        ps_dict = defaultdict(list)
+        for p in ps:
+            prefix = p['name'].split('_')[0]
+            ps_dict[prefix].append(p)
+        role['permissions'] = dict(ps_dict)
+        return role
+
+    @classmethod
+    def create_client_role_and_policy(cls, role_name: str, des: str):
         """
         创建角色同时创建基于角色的策略
         返回创建的角色
         """
+        # 获取当前时间
+        current_time = datetime.now()
+        formatted_time = current_time.strftime("%Y-%m-%d %H:%M:%S")
         role_payload = {
             'name': role_name,
+            'description': des,
+            'attributes': {'created':[formatted_time, ]},
             'clientRole': True
         }
         cls.keycloak_utils.get_keycloak_admin().create_client_role(cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT']
@@ -1053,44 +1092,62 @@ class KeycloakRoleController:
                                                                             role)
 
     @classmethod
-    def ch_permission_role(cls, role_id: str, permission_id: str):
+    def ch_permission_role(cls, role_id: str, permission_ids: list):
         """
         配置permission中的role(policy)
         """
-        # 1.获取permission
-        permission = None
+        # 1.获取permissions
+        permissions = list()
         ps = cls.keycloak_utils.get_keycloak_admin().get_client_authz_permissions(
             cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
         for p in ps:
-            if p['id'] == permission_id:
-                permission = p
-                break
-        # 2.获取相关resources的id
-        rs = cls.keycloak_utils.get_resources_by_permission(permission_id)
-        resources = list(map(lambda r: r['_id'], rs))
-        # 3.获取相关policy的id
-        acpos = cls.keycloak_utils.get_policy_by_permission(permission_id)
-        policies = list(map(lambda p: p['id'], acpos))
-        # 4.通过role name获取需要被更更改的 policyid
+            if p['id'] in permission_ids:
+                permissions.append(p)
+        # 2.获取所有permission相关的resources的id
+        resources = list()
+        for p_id in permission_ids:
+            resources.append(list(map(lambda r: r['_id'], cls.keycloak_utils.get_resources_by_permission(p_id))))
+        # 3.获取所有permission相关policy的id
+        policies = list()
+        for p_id in permission_ids:
+            policies.append(list(map(lambda p: p['id'], cls.keycloak_utils.get_policy_by_permission(p_id))))
+        # 4.通过role id获取需要被更更改的 policyid
+        policy_id = None
         pos = cls.keycloak_utils.get_keycloak_admin().get_client_authz_policies(
             cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
-        policy_id = None
         for po in pos:
             if po['type'] == 'role':
                 if json.loads(po['config']['roles'])[0]['id'] == role_id:
                     policy_id = po['id']
                     break
         # 5.构建payload
-        payload = permission
-        payload['resources'] = resources
-        # 6.如不存在policy则增，反之
-        if policy_id in policies:
-            policies.remove(policy_id)
-        else:
-            policies.append(policy_id)
-        payload['policies'] = policies
-        payload['scopes'] = []
-        cls.keycloak_utils.update_permission(permission_id, payload)
+        for i in range(len(permissions)):
+            payload = permissions[i]
+            payload['resources'] = resources[i]
+            # 6.如不存在policy则增，反之
+            payload['policies'] = policies[i]
+            if policy_id in payload['policies']:
+                payload['policies'].remove(policy_id)
+            else:
+                payload['policies'].append(policy_id)
+            payload['scopes'] = []
+            cls.keycloak_utils.update_permission(permission_ids[i], payload)
+
+    @classmethod
+    def edit_role(cls, role_id: str, des : str):
+        """
+        编辑角色的描述
+        """
+        roles = cls.keycloak_utils.get_keycloak_admin().get_client_roles(cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
+        role = None
+        for r in roles:
+            if r['id'] == role_id:
+                role = r
+                break
+        role['description'] = des
+        cls.keycloak_utils.get_keycloak_admin().update_client_role(cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'],
+                                                                   role['name'],
+                                                                   role)
 
 
 class KeycloakPermissionController:
@@ -1107,7 +1164,7 @@ class KeycloakPermissionController:
             cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
 
     @classmethod
-    def get_permissions(cls, token: str) -> list:
+    def get_permissions(cls, token: str) -> dict:
         '''
         获取token持有者所拥有的权限
         '''
@@ -1121,14 +1178,21 @@ class KeycloakPermissionController:
             for permission in ps:
                 if permission['name'] in p_list:
                     permission['allow'] = True
+            pd = dict()
+            for permission in ps:
+                strs = permission['name'].split("_")
+                if not pd.get(strs[0], None):
+                    pd[strs[0]] = [permission]
+                else:
+                    pd[strs[0]].append(permission)
         except Exception as e:
             pass
-        return ps
+        return pd
 
     @classmethod
     def has_permissions(cls, token: str, permission_name: str) -> bool:
         try:
-            cls.keycloak_utils.get_keycloak_openid().uma_permissions(token, permissions=[permission_name])
+            cls.keycloak_utils.get_keycloak_openid().uma_permissions(token, permissions= [permission_name, ])
         except Exception as e:
             return False
         return True

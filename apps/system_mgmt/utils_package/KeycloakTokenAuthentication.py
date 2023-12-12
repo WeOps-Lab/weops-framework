@@ -38,6 +38,12 @@ class KeycloakTokenAuthentication(BaseAuthentication):
         if not tokeninfo.get('active', False):
             raise AuthenticationFailed('Token exp or invalid')
         # 根据token找对应的user
-        user_id = tokeninfo['sub']
-        user = KeycloakUserController.get_user_by_id(user_id)
-        return user, token
+        # user = {
+        #     'id':tokeninfo['sub'],
+        #     'username':tokeninfo['preferred_username'],
+        #     'name':tokeninfo['name'],
+        #     'email':tokeninfo['email'],
+        #
+        # }
+        tokeninfo['is_authenticated'] = True
+        return tokeninfo, token

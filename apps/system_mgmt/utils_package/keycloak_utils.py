@@ -1,6 +1,10 @@
+import json
+import tempfile
+import os
 import requests
 from django.conf import LazySettings
 from keycloak import KeycloakOpenID, KeycloakOpenIDConnection, KeycloakAdmin
+import io
 
 
 class KeycloakUtils:
@@ -22,10 +26,19 @@ class KeycloakUtils:
             client_id=f'{self.__settings.KEYCLOAK_SETTINGS["CLIENT_ID"]}',
             realm_name=f'{self.__settings.KEYCLOAK_SETTINGS["REALM_NAME"]}',
             client_secret_key=f'{self.__settings.KEYCLOAK_SETTINGS["CLIENT_SECRET_KEY"]}')
-        self.__keycloak_openid.load_authorization_config(self.__settings.KEYCLOAK_SETTINGS["AUTH_INFO_FILE_PATH"])
-        self.__admin_token = None
-        self.__keycloak_admin = None
+        # self.__keycloak_openid.load_authorization_config(self.__settings.KEYCLOAK_SETTINGS["AUTH_INFO_FILE_PATH"])
+        self.__admin_token: str = None
+        self.__keycloak_admin: KeycloakAdmin = None
         self.__refresh_keycloak_admin__()
+        # 获取权限配置文件
+        auth_json = self.__keycloak_admin.get_client_authz_settings(self.__settings.KEYCLOAK_SETTINGS["ID_OF_CLIENT"])
+        json_str = json.dumps(auth_json)
+        with tempfile.NamedTemporaryFile(mode='w+', delete=False) as temp_file:
+            temp_file.write(json_str)
+            temp_file_path = temp_file.name
+        self.__keycloak_openid.load_authorization_config(temp_file_path)
+        os.remove(temp_file_path)
+
     
     def __refresh_keycloak_admin__(self):
         '''
@@ -42,7 +55,7 @@ class KeycloakUtils:
                 "Authorization": f"Bearer {self.__admin_token}"
             },
             verify=True)
-        self.__keycloak_admin = KeycloakAdmin(connection=keycloak_connection)
+        self.__keycloak_admin: KeycloakAdmin = KeycloakAdmin(connection=keycloak_connection)
 
     def get_keycloak_openid(self) -> KeycloakOpenID:
         '''
