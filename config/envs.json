@@ -15,6 +15,6 @@
     "source_key": "LOGIN_METHOD",
     "env_key": "BKAPP_LOGIN_METHOD",
     "examples": "local",
-    "desc": "local代表本地django登录、blueking代表蓝鲸登录、other代表第三方登录"
+    "desc": "keyloack代表keyclack登录、local代表本地django登录、blueking代表蓝鲸登录、other代表第三方登录"
   }
 ]

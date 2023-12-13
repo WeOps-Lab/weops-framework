@@ -31,7 +31,7 @@ class LogSerializer(ModelSerializer):
 
     @transaction.atomic
     def update(self, instance, validated_data):
-        username = self.context["request"].user.username
+        username = self.context["request"].user.get('username', None)
         validated_data["value"] = self.img_base64
         validated_data.pop("file")
         OperationLog.create_log([instance], OperationLog.MODIFY, username, "修改系统logo")

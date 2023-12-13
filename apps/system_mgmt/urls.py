@@ -14,8 +14,9 @@ specific language governing permissions and limitations under the License.
 from django.conf.urls import url
 
 from apps.system_mgmt import views
+from rest_framework.routers import DefaultRouter
 
-urlpatterns = (
+urlpatterns = [
     url(r"^test_get/$", views.test_get),
     url(r"^test_post/$", views.test_post),
     url(r"^logo/$", views.LogoViewSet.as_view({"get": "retrieve", "put": "update"})),
@@ -25,4 +26,14 @@ urlpatterns = (
     url(r"open_set_user_roles/$", views.open_set_user_roles),
     url(r"get_is_need_two_factor/$", views.get_is_need_two_factor),
     url(r"send_validate_code_exempt/$", views.send_validate_code_exempt),
-)
+    url(r"login_info/$", views.LoginInfoView.as_view()),
+    # 用户登录
+    url(r"keycloak_login/$", views.KeycloakLoginView.as_view()),
+]
+
+router = DefaultRouter()
+router.register(r'users', views.KeycloakUserViewSet, basename='user')
+router.register(r'roles', views.KeycloakRoleViewSet, basename='role')
+router.register(r'permissions', views.KeycloakPermissionViewSet, basename='permission')
+# 用户管理API
+urlpatterns.extend(router.urls)

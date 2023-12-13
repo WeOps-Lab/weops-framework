@@ -78,13 +78,24 @@ MIDDLEWARE += (  # noqa
 
 # 配置缓存
 CACHES = locals()["CACHES"]
-REDIS_PASSWORD = os.environ.get("BKAPP_REDIS_PASSWORD", "123456")
-REDIS_HOST = os.environ.get("BKAPP_REDIS_HOST", "127.0.0.1")
+REDIS_PASSWORD = os.environ.get("BKAPP_REDIS_PASSWORD", "")
+REDIS_HOST = os.environ.get("BKAPP_REDIS_HOST", "redis-container")
 REDIS_PORT = os.environ.get("BKAPP_REDIS_PORT", "6379")
 REDIS_DB = os.environ.get("BKAPP_REDIS_DB", 0)
 AUTO_MATE_REDIS_DB = os.environ.get("BKAPP_AUTO_MATE_REDIS_DB", 11)
+# 去环境变量寻找登录方式，找不到就用keycloak
 LOGIN_METHOD = os.environ.get("BKAPP_LOGIN_METHOD", "keycloak")
 LOGIN_REDIRECT_URL = '/admin/' if LOGIN_METHOD == "local" else '/keycloak_login/'
+KEYCLOAK_SETTINGS = {
+    "HOST" : os.environ.get("BKAPP_KEYCLOAK_SERVER_URL", "keycloak-container"),
+    "PORT" : os.environ.get("BKAPP_KEYCLOAK_SERVER_URL", "8080"),
+    "REALM_NAME" : os.environ.get("BKAPP_REALM_NAME", "master"),
+    "CLIENT_ID" : os.environ.get("BKAPP_CLIENT_ID", "weops_lite"),
+    "ID_OF_CLIENT" :  os.environ.get("BKAPP_ID_OF_CLIENT", ""),
+    "CLIENT_SECRET_KEY" : os.environ.get("BKAPP_CLIENT_SECRET_KEY", ""),
+    "ADMIN_USERNAME" : os.environ.get("BKAPP_ADMIN_USERNAME", "admin"),
+    "ADMIN_PASSWORD" : os.environ.get("BKAPP_ADMIN_USERNAME", "admin")
+}
 
 
 try:
@@ -98,7 +109,7 @@ else:
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
             "COMPRESSOR": "django_redis.compressors.zlib.ZlibCompressor",
-        },
+        }
     }
 
 if "redis" in CACHES:
@@ -260,6 +271,9 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "rest_framework.schemas.coreapi.AutoSchema",
     # "EXCEPTION_HANDLER": "utils.exception_capture.common_exception_handler",
 }
+if LOGIN_METHOD == 'keycloak':
+    REST_FRAMEWORK['DEFAULT_AUTHENTICATION_CLASSES'] = ('apps.system_mgmt.utils_package.KeycloakTokenAuthentication'
+                                                        '.KeycloakTokenAuthentication',)
 
 HAYSTACK_CONNECTIONS = {
     "default": {

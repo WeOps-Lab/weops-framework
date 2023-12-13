@@ -48,8 +48,8 @@ class UserUtils(object):
         normal_role = kwargs["normal_role"]
         user_data["bk_username"] = data["username"]
         user_data["chname"] = data["display_name"]
-        user_data["phone"] = data["telephone"]
-        user_data["email"] = data["email"]
+        user_data["phone"] = data.get("telephone", '000')
+        user_data["email"] = data.get('email', 'example@ex.com')
         user_data["leader"] = data.get("leader", [])
         user_data["roles"] = normal_role
 
@@ -76,11 +76,15 @@ class UserUtils(object):
         """
         update_data = {}
         data = kwargs["data"]
-        bk_user_id = data.pop("bk_user_id")
+        bk_user_id = data.get("bk_user_id", 0)
         user_id = data.pop("id")
         update_data["chname"] = data["display_name"]
-        update_data["phone"] = data["telephone"]
-        update_data["email"] = data["email"]
+        phone = data.get('telephone', None)
+        if phone:
+            update_data["phone"] = phone
+        email = data.get('email', None)
+        if email:
+            update_data['email'] = email
         update_data["leader"] = data.get("leader", [])
 
         return update_data, bk_user_id, user_id

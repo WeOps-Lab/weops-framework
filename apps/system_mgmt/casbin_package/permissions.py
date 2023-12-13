@@ -60,7 +60,7 @@ def get_user_roles(user: User, activate: bool = True):
         user_super = True
         user_apps_obj = SysApps.objects.filter(app_key=DB_APPS, sys_role=super_group).first()
         if user_apps_obj is None:
-            user_apps = [i["bk_biz_id"] for i in BizUtils.get_all_biz_list()]
+            # user_apps = [i["bk_biz_id"] for i in BizUtils.get_all_biz_list()]
             SysApps.objects.create(
                 **{
                     "app_name": DB_APPS_DISPLAY_NAME,

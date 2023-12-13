@@ -4,8 +4,18 @@ import django.db.models.deletion
 from django.db import migrations, models
 
 
-class Migration(migrations.Migration):
+def add_default_data(apps, schema_editor):
+    sysrole_model = apps.get_model('system_mgmt', 'SysRole')
+    role = sysrole_model.objects.create(role_name='normal_group')
+    role_super = sysrole_model.objects.create(role_name='admin_group')
+    sysuser_model = apps.get_model('system_mgmt', 'SysUser')
+    sysuser = sysuser_model.objects.create(bk_username='admin', phone='18888888888',
+                                           email='admin@admin.com', leader=[])
+    sysuser.roles.add(role)
+    sysuser.roles.add(role_super)
 
+
+class Migration(migrations.Migration):
     dependencies = [
         ("system_mgmt", "0019_instancespermissions"),
     ]
@@ -16,4 +26,5 @@ class Migration(migrations.Migration):
             name="role",
             field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to="system_mgmt.SysRole"),
         ),
+        migrations.RunPython(add_default_data)
     ]

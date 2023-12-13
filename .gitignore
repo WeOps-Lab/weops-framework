@@ -5,18 +5,17 @@ __pycache__/
 
 # C extensions
 *.so
-static/
 # Distribution / packaging
 .Python
 build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
 lib/
 lib64/
 parts/
+dist/
 sdist/
 var/
 wheels/
