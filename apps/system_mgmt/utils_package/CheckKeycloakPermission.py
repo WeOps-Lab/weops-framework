@@ -16,6 +16,8 @@ def check_keycloak_permission(permission_name, check_user_itself: bool = True):
     def decorator(view_func):
         @wraps(view_func)
         def wrapper(self, request, *args, **kwargs):
+            token = request.auth
+            has_per = KeycloakPermissionController.has_permissions(token, permission_name)
             if not check_user_itself:
                 # 获取函数的参数信息
                 signature = inspect.signature(view_func)
@@ -31,12 +33,11 @@ def check_keycloak_permission(permission_name, check_user_itself: bool = True):
                 options = {"verify_signature": True, "verify_aud": False, "verify_exp": True}
                 token_info = keycloak_util.get_keycloak_openid().decode_token(request.auth, key=KEYCLOAK_PUBLIC_KEY,
                                                           options=options)
-                if pk != token_info['sub']:
+                if pk != token_info['sub'] and not has_per:
                     return Response({'error': f'Not user itself'},
                                     status=status.HTTP_403_FORBIDDEN)
             else:
-                token = request.auth
-                if not KeycloakPermissionController.has_permissions(token, permission_name):
+                if not has_per:
                     return Response({'error': f'Permission denied by {permission_name}'}, status=status.HTTP_403_FORBIDDEN)
             return view_func(self, request, *args, **kwargs)
 

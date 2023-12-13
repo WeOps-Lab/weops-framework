@@ -45,7 +45,6 @@ class KeycloakBackend(ModelBackend):
         # 如果验证成功，返回包含用户数据的字典；否则返回 None
         # 例如，您可以使用 requests 库来向 Keycloak 发送验证请求
 
-        # TODO 完善验证逻辑
 
         # 示例验证逻辑：
 

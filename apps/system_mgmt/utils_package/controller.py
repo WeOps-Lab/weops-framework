@@ -884,9 +884,9 @@ class KeycloakUserController(object):
     _settings = LazySettings()
 
     @classmethod
-    def get_access_token(cls, username: str, password: str) -> str:
-        token = cls.keycloak_utils.get_keycloak_openid().token(username, password).get('access_token', None)
-        return token
+    def get_token(cls, username: str, password: str) -> (str, str):
+        token = cls.keycloak_utils.get_keycloak_openid().token(username, password)
+        return token.get('access_token', None), token.get('refresh_token', None)
 
     @classmethod
     def create_user(cls, user) -> str:

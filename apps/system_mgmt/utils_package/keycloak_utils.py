@@ -20,6 +20,7 @@ class KeycloakUtils:
         return cls._instance
 
     def __init__(self):
+        self.__get_client_settings__()
         self.__settings = LazySettings()
         self.__keycloak_openid = KeycloakOpenID(
             server_url=f'http://{self.__settings.KEYCLOAK_SETTINGS["HOST"]}:{self.__settings.KEYCLOAK_SETTINGS["PORT"]}/',
@@ -39,17 +40,36 @@ class KeycloakUtils:
         self.__keycloak_openid.load_authorization_config(temp_file_path)
         os.remove(temp_file_path)
 
-    
+    def __get_client_settings__(self):
+        """
+        获取客户端的ID和SECRET，写入settings配置内
+        """
+        settings = LazySettings()
+        keycloak_admin = KeycloakAdmin(
+            server_url=f'http://{settings.KEYCLOAK_SETTINGS["HOST"]}:{settings.KEYCLOAK_SETTINGS["PORT"]}/',
+            username=settings.KEYCLOAK_SETTINGS["ADMIN_USERNAME"],
+            password=settings.KEYCLOAK_SETTINGS["ADMIN_PASSWORD"],
+            user_realm_name='master',
+            realm_name=settings.KEYCLOAK_SETTINGS["REALM_NAME"],
+            client_id="admin-cli")
+        clients = keycloak_admin.get_clients()
+        for client in clients:
+            if client['clientId'] == settings.KEYCLOAK_SETTINGS["CLIENT_ID"]:
+                settings.KEYCLOAK_SETTINGS["ID_OF_CLIENT"] = client['id']
+                settings.KEYCLOAK_SETTINGS["CLIENT_SECRET_KEY"] = client['secret']
+
     def __refresh_keycloak_admin__(self):
         '''
         更新keycloak_admin
         '''
         self.__admin_token = self.__keycloak_openid.token(self.__settings.KEYCLOAK_SETTINGS["ADMIN_USERNAME"],
-                                                          self.__settings.KEYCLOAK_SETTINGS["ADMIN_PASSWORD"]).get('access_token', None)
+                                                          self.__settings.KEYCLOAK_SETTINGS["ADMIN_PASSWORD"]).get(
+            'access_token', None)
         keycloak_connection = KeycloakOpenIDConnection(
             server_url=f'http://{self.__settings.KEYCLOAK_SETTINGS["HOST"]}:{self.__settings.KEYCLOAK_SETTINGS["PORT"]}/',
             realm_name=f'{self.__settings.KEYCLOAK_SETTINGS["REALM_NAME"]}',
             client_id=f'{self.__settings.KEYCLOAK_SETTINGS["CLIENT_ID"]}',
+            user_realm_name='master',
             client_secret_key=f'{self.__settings.KEYCLOAK_SETTINGS["CLIENT_SECRET_KEY"]}',
             custom_headers={
                 "Authorization": f"Bearer {self.__admin_token}"
@@ -107,7 +127,7 @@ class KeycloakUtils:
         if int(response.status_code / 100) == 2:
             return response.content
         else:
-            raise Exception(str({'code':response.status_code, 'msg':response.content}))
+            raise Exception(str({'code': response.status_code, 'msg': response.content}))
 
     def get_resources_by_permission(self, permission_id: str):
         '''
@@ -192,7 +212,7 @@ class KeycloakUtils:
         else:
             raise Exception(str({'code': response.status_code, 'msg': response.content}))
 
-    def get_users_in_role(self, role_name: str, params : dict):
+    def get_users_in_role(self, role_name: str, params: dict):
         '''
         获取某角色中的所有用户
         '''
@@ -248,3 +268,20 @@ class KeycloakUtils:
             return response.content
         else:
             raise Exception(str({'code': response.status_code, 'msg': response.content}))
+
+    def get_user_detail(self, user_id):
+        url = f'http://{self.__settings.KEYCLOAK_SETTINGS["HOST"]}:{self.__settings.KEYCLOAK_SETTINGS["PORT"]}/' \
+              f'admin/realms/{self.__settings.KEYCLOAK_SETTINGS["REALM_NAME"]}/users/{user_id}'
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.__admin_token}"
+        }
+        response = requests.get(url, headers=headers, params={'userProfileMetadata': True})
+        if int(response.status_code / 100) == 2:
+            return response.json()
+        else:
+            raise Exception(str({'code': response.status_code, 'msg': response.content}))
+
+    def refresh_token(self, refresh_token: str) -> (str, str):
+        token = self.__keycloak_openid.refresh_token(refresh_token)
+        return token.get('access_token', None), token.get('refresh_token', None)

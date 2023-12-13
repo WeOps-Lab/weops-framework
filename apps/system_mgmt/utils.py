@@ -1,9 +1,12 @@
 import importlib
+import json
 import os
 from inspect import isfunction
 
+from django.conf import LazySettings
+from django.conf import settings as conf_settings
 from django.db import transaction
-
+from keycloak import KeycloakAdmin
 
 from apps.system_mgmt.constants import (
     DB_APPS,
@@ -455,3 +458,46 @@ def init_keycloak(**kwargs):
     1. 创建client
     2. 创建client role: admin 和 normal
     """
+    # TODO 初始化keycloak
+    settings = LazySettings()
+    keycloak_admin = KeycloakAdmin(
+        server_url=f'http://{settings.KEYCLOAK_SETTINGS["HOST"]}:{settings.KEYCLOAK_SETTINGS["PORT"]}/',
+        username=settings.KEYCLOAK_SETTINGS["ADMIN_USERNAME"],
+        password=settings.KEYCLOAK_SETTINGS["ADMIN_PASSWORD"],
+        realm_name='master',
+        client_id="admin-cli")
+    # 读realm配置文件
+    realm_config_file_path = os.path.join(settings.BASE_DIR, 'config', 'realm-export-weops.json')
+    with open(realm_config_file_path, 'r') as realm_config_file:
+        realm_config = json.load(realm_config_file)
+    if realm_config['realm'] != settings.KEYCLOAK_SETTINGS["REALM_NAME"]:
+        raise ValueError(f'keycloak initialization error: realm name in file {realm_config_file_path} should '
+                         f'be the same in settings')
+    # 如果不存在则创建realm
+    realms = keycloak_admin.get_realms()
+    realm_exist = False
+    for realm in realms:
+        if realm['realm'] == realm_config['realm']:
+            realm_exist = True
+            break
+    if not realm_exist:
+        keycloak_admin.create_realm(payload=realm_config, skip_exists=True)
+    # 登录新域账号创建两个用户，并分配角色
+    keycloak_admin = KeycloakAdmin(
+        server_url=f'http://{settings.KEYCLOAK_SETTINGS["HOST"]}:{settings.KEYCLOAK_SETTINGS["PORT"]}/',
+        username=settings.KEYCLOAK_SETTINGS["ADMIN_USERNAME"],
+        password=settings.KEYCLOAK_SETTINGS["ADMIN_PASSWORD"],
+        realm_name=settings.KEYCLOAK_SETTINGS["REALM_NAME"],
+        client_id="admin-cli",
+        user_realm_name="master")
+
+    # TODO 可能有问题，用到了动态配置
+    admin_role = keycloak_admin.get_client_role(settings.KEYCLOAK_SETTINGS["ID_OF_CLIENT"], 'admin')
+
+    admin_user = {
+        'username': 'admin',
+        'credentials': [{"value": 'admin', "type": 'password', }],
+        'email': 'admin@kc.com',
+        'lastName': '管理员',
+        'enabled': True
+    }

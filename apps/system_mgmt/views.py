@@ -251,7 +251,7 @@ class SysUserViewSet(ModelViewSet):
         UserUtils.pull_sys_user()
         current_ip = getattr(request, "current_ip", "127.0.0.1")
         OperationLog.objects.create(
-            operator=request.user.username,
+            operator=request.user.get('username', None),
             operate_type=OperationLog.ADD,
             operate_obj=SysUser._meta.verbose_name,
             operate_summary="手动拉取蓝鲸用户",
@@ -342,10 +342,10 @@ class SysSettingViewSet(ModelViewSet):
             SysSetting.objects.filter(key__in=["two_factor_enable", "auth_type", "auth_white_list"]).delete()
             SysSetting.objects.bulk_create(set_list)
             OperationLog.objects.create(
-                operator=request.user.username,
+                operator=request.user.get('username', None),
                 operate_type=OperationLog.MODIFY,
                 operate_obj="多因子认证",
-                operate_summary=f"用户{request.user.username}修改了多因子认证信息",
+                operate_summary=f"用户{request.user.get('username', None)}修改了多因子认证信息",
                 current_ip=getattr(request, "current_ip", "127.0.0.1"),
                 app_module="系统配置",
                 obj_type="多因子认证",
@@ -355,7 +355,7 @@ class SysSettingViewSet(ModelViewSet):
     @action(methods=["POST"], detail=False)
     @ApiLog("发送验证码")
     def send_validate_code(self, request):
-        user = request.user.username
+        user = request.user.get('username', None)
         result = _send_validate_code(user)
         return JsonResponse(result)
 
@@ -404,14 +404,14 @@ class KeycloakLoginView(views.APIView):
         if username is None or password is None:
             return Response({'detail': 'username or password are not present!'}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            token = KeycloakUserController.get_access_token(username, password)
+            token, refresh_token = KeycloakUserController.get_token(username, password)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         if token is None:
             # 用户验证失败，返回错误响应
             return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
         else:
-            return Response({'token': token}, status=status.HTTP_200_OK)
+            return Response({'token': token, 'refresh_token': refresh_token}, status=status.HTTP_200_OK)
 
 
 class KeycloakUserViewSet(viewsets.ViewSet):
@@ -546,12 +546,6 @@ class KeycloakUserViewSet(viewsets.ViewSet):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'id': pk}, status=status.HTTP_200_OK)
-
-    def ch_self_pwd(self, request: Request):
-        """
-        更改用户自己的密码
-        """
-        pass
 
 
 class KeycloakRoleViewSet(viewsets.ViewSet):
@@ -816,7 +810,6 @@ class UserManageViewSet(ModelViewSet):
         """
         重置密码
         """
-        # TODO 接入keycloak
         id = request.data.get('id', None)
         password = request.data.get('password', None)
         if id is None or password is None:
@@ -1099,7 +1092,7 @@ class MenuManageModelViewSet(ModelViewSet):
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
         OperationLog.objects.create(
-            operator=request.user.username,
+            operator=request.user.get('username', None),
             operate_type=OperationLog.MODIFY,
             operate_obj=instance.menu_name,
             operate_summary="自定义菜单管理修改自定义菜单:[{}]".format(instance.menu_name),
@@ -1120,7 +1113,7 @@ class MenuManageModelViewSet(ModelViewSet):
         self.perform_create(serializer)
         instance = serializer.instance
         OperationLog.objects.create(
-            operator=request.user.username,
+            operator=request.user.get('username', None),
             operate_type=OperationLog.ADD,
             operate_obj=instance.menu_name,
             operate_summary="自定义菜单管理新增自定义菜单:[{}]".format(instance.menu_name),
@@ -1142,7 +1135,7 @@ class MenuManageModelViewSet(ModelViewSet):
 
         instance.delete()
         OperationLog.objects.create(
-            operator=request.user.username,
+            operator=request.user.get('username', None),
             operate_type=OperationLog.DELETE,
             operate_obj=instance.menu_name,
             operate_summary="自定义菜单管理删除自定义菜单:[{}]".format(instance.menu_name),
@@ -1248,7 +1241,7 @@ class InstancesPermissionsModelViewSet(ModelViewSet):
             serializer.is_valid(raise_exception=True)
             self.perform_create(serializer)
             OperationLog.objects.create(
-                operator=request.user.username,
+                operator=request.user.get('username', None),
                 operate_type=OperationLog.ADD,
                 operate_obj=request.data["instance_type"],
                 operate_summary="创建实例权限对象:【{}".format(request.data["instance_type"]),
@@ -1282,7 +1275,7 @@ class InstancesPermissionsModelViewSet(ModelViewSet):
             serializer.is_valid(raise_exception=True)
             self.perform_update(serializer)
             OperationLog.objects.create(
-                operator=request.user.username,
+                operator=request.user.get('username', None),
                 operate_type=OperationLog.MODIFY,
                 operate_obj=instance.instance_type,
                 operate_summary="修改实例权限对象:【{}".format(instance.instance_type),
@@ -1320,7 +1313,7 @@ class InstancesPermissionsModelViewSet(ModelViewSet):
             instance = self.get_object()
             self.perform_destroy(instance)
             OperationLog.objects.create(
-                operator=request.user.username,
+                operator=request.user.get('username', None),
                 operate_type=OperationLog.DELETE,
                 operate_obj=instance.instance_type,
                 operate_summary="删除实例权限对象:【{}".format(instance.instance_type),
@@ -1446,7 +1439,7 @@ class LoginInfoView(views.APIView):
         # return Response(
         #     {
         #         "weops_menu": weops_menu,
-        #         "username": request.user.username,
+        #         "username": request.user.get('username', None),
         #         "applications": applications or list(MENUS_MAPPING.keys()),  # weops有的权限
         #         "is_super": user_super,
         #         "menus": user_menus,
@@ -1491,7 +1484,8 @@ class LoginInfoView(views.APIView):
         #             pass
         return Response({
             'username': request.user['username'],
-            'chname': request.user['name'],
+            'id' : request.user['id'],
+            'chname': request.user.get('lastName', ""),
             'email': request.user['email'],
             'token': request.auth,
             'is_super': is_super,

@@ -11,9 +11,11 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 from keycloak import KeycloakOpenID, KeycloakOpenIDConnection, KeycloakAdmin
+from types import SimpleNamespace
 
 import unittest
 import uuid
+import json
 
 class PythonKeycloakTest(unittest.TestCase):
     def setUp(self):
@@ -76,6 +78,19 @@ class PythonKeycloakTest(unittest.TestCase):
         print(p)
         pass
 
+    def test_get_client_info(self):
+        # 用这种方式在新realm登录
+        keycloak_admin = KeycloakAdmin(server_url="http://localhost:8081/",
+                                       username="admin",
+                                       password="admin",
+                                       realm_name="weops",
+                                       client_id="admin-cli",
+                                       user_realm_name='master')
+        with open(r'D:\Projectes\weops-framework\config\realm-export.json', 'r', encoding='utf8') as realm_config_file:
+            realm_config = json.load(realm_config_file)
+        clients = keycloak_admin.get_clients()
+        pass
+
     def test_create_role(self):
         role_name='test'
         role_payload = {
@@ -99,6 +114,12 @@ class PythonKeycloakTest(unittest.TestCase):
         self.keycloak_admin.create_client_authz_role_based_policy(
             self.id_of_client
             , policy_payload)
+
+    def test_simple_namespace(self):
+        obj = SimpleNamespace(name='ddd')
+        print(obj.name)
+        realms = self.keycloak_admin.get_realms()
+        pass
 
 if __name__ == '__main__':
     unittest.main()
