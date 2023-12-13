@@ -880,13 +880,20 @@ class KeycloakUserController(object):
     用户的增删改查全部借用管理员账号
     '''
 
-    keycloak_utils: KeycloakUtils = KeycloakUtils()
+    # keycloak_utils: KeycloakUtils = KeycloakUtils()
+    _keycloak_utils = None
+
+    @classmethod
+    def keycloak_utils(cls):
+        if cls._keycloak_utils is None:
+            cls._keycloak_utils = KeycloakUtils()
+        return cls._keycloak_utils
     _settings = LazySettings()
 
     @classmethod
     def get_token(cls, username: str, password: str) -> (str, str):
-        token = cls.keycloak_utils.get_keycloak_openid().token(username, password)
-        return token.get('access_token', None), token.get('refresh_token', None)
+        token = cls.keycloak_utils().get_keycloak_openid().token(username, password)
+        return token.get('access_token', None)
 
     @classmethod
     def create_user(cls, user) -> str:
@@ -894,11 +901,11 @@ class KeycloakUserController(object):
         返回的字典包含新创建用户的id
         '''
         # 该方法返回创建用户的id
-        normal_role = cls.keycloak_utils.get_keycloak_admin().get_client_role(
+        normal_role = cls.keycloak_utils().get_keycloak_admin().get_client_role(
             cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'],
             'normal')
-        id = cls.keycloak_utils.get_keycloak_admin().create_user(user)
-        cls.keycloak_utils.get_keycloak_admin().assign_client_role(id, cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'],
+        id = cls.keycloak_utils().get_keycloak_admin().create_user(user)
+        cls.keycloak_utils().get_keycloak_admin().assign_client_role(id, cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'],
                                                                    normal_role)
         return id
 
@@ -907,15 +914,15 @@ class KeycloakUserController(object):
         first = (page - 1) * per_page
         max = per_page
         params = {"first": first, "max": max, "search": search}
-        users = cls.keycloak_utils.get_keycloak_admin().get_users(params)
+        users = cls.keycloak_utils().get_keycloak_admin().get_users(params)
         id_of_client = cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT']
         for user in users:
-            user['roles'] = cls.keycloak_utils.get_keycloak_admin().get_client_roles_of_user(user['id'], id_of_client)
+            user['roles'] = cls.keycloak_utils().get_keycloak_admin().get_client_roles_of_user(user['id'], id_of_client)
         return {"count": len(users), "users": users}
 
     @classmethod
     def get_user_in_role(cls, role_id: str, page, per_page):
-        roles = cls.keycloak_utils.get_keycloak_admin().get_client_roles(cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
+        roles = cls.keycloak_utils().get_keycloak_admin().get_client_roles(cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
         role_name = None
         for role in roles:
             if role['id'] == role_id:
@@ -926,12 +933,12 @@ class KeycloakUserController(object):
         first = (page - 1) * per_page
         max = per_page
         params = {"first": first, "max": max}
-        users = cls.keycloak_utils.get_users_in_role(role_name, params)
+        users = cls.keycloak_utils().get_users_in_role(role_name, params)
         return users
 
     @classmethod
     def get_user_by_id(cls, id):
-        user = cls.keycloak_utils.get_keycloak_admin().get_user(id)
+        user = cls.keycloak_utils().get_keycloak_admin().get_user(id)
         return user
 
     @classmethod
@@ -940,20 +947,20 @@ class KeycloakUserController(object):
             'exact': True,
             'username': name
         }
-        users = cls.keycloak_utils.get_keycloak_admin().get_users(params)
+        users = cls.keycloak_utils().get_keycloak_admin().get_users(params)
         return users[0] if len(users) != 0 else None
 
     @classmethod
     def delete_user(cls, user_id: str):
-        cls.keycloak_utils.get_keycloak_admin().delete_user(user_id)
+        cls.keycloak_utils().get_keycloak_admin().delete_user(user_id)
 
     @classmethod
     def update_user(cls, user_id: str, payload: dict):
-        cls.keycloak_utils.get_keycloak_admin().update_user(user_id, payload)
+        cls.keycloak_utils().get_keycloak_admin().update_user(user_id, payload)
 
     @classmethod
     def reset_password(cls, user_id: str, password: str):
-        cls.keycloak_utils.get_keycloak_admin().set_user_password(user_id, password, False)
+        cls.keycloak_utils().get_keycloak_admin().set_user_password(user_id, password, False)
 
 
 class KeycloakRoleController:
@@ -961,12 +968,19 @@ class KeycloakRoleController:
     角色的操作(client role)，需同步policy的操作
     '''
 
-    keycloak_utils: KeycloakUtils = KeycloakUtils()
+    # keycloak_utils: KeycloakUtils = KeycloakUtils()
+    _keycloak_utils = None
+
+    @classmethod
+    def keycloak_utils(cls):
+        if cls._keycloak_utils is None:
+            cls._keycloak_utils = KeycloakUtils()
+        return cls._keycloak_utils
     _settings = LazySettings()
 
     @classmethod
     def get_roles_by_user_id(cls, id: str):
-        return cls.keycloak_utils.get_keycloak_admin().get_client_roles_of_user(id, cls._settings.KEYCLOAK_SETTINGS[
+        return cls.keycloak_utils().get_keycloak_admin().get_client_roles_of_user(id, cls._settings.KEYCLOAK_SETTINGS[
             'ID_OF_CLIENT'])
 
     @classmethod
@@ -974,7 +988,7 @@ class KeycloakRoleController:
         '''
         获取角色中的用户
         '''
-        users = cls.keycloak_utils.get_keycloak_admin().get_client_role_members(
+        users = cls.keycloak_utils().get_keycloak_admin().get_client_role_members(
             cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'],
             role_name)
         return users
@@ -985,17 +999,17 @@ class KeycloakRoleController:
         获取所有客户端角色，把默认的角色删除
         无权限，权限去详情接口里找
         """
-        roles = cls.keycloak_utils.get_keycloak_admin().get_client_roles(
+        roles = cls.keycloak_utils().get_keycloak_admin().get_client_roles(
             cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'], False)
         roles_dict = {r['name']: r for r in list(filter(lambda r: r['name'] != 'uma_protection', roles))}
         # 获取相关policy，并记录其id
-        # policies = cls.keycloak_utils.get_keycloak_admin().get_client_authz_policies(cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
+        # policies = cls.keycloak_utils().get_keycloak_admin().get_client_authz_policies(cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
         # for policy in policies:
         #     if policy['name'] in roles_dict:
         #         roles_dict[policy['name']]['policy_id'] = policy['id']
         # # 根据policy id查出依赖的permission
         # for name, role in roles_dict.items():
-        #     permissions = cls.keycloak_utils.get_permission_by_policy(role['policy_id'])
+        #     permissions = cls.keycloak_utils().get_permission_by_policy(role['policy_id'])
         #     role['permissions'] = permissions
         return list(roles_dict.values())
 
@@ -1004,21 +1018,21 @@ class KeycloakRoleController:
         """
         根据角色id获取其详情以及其所拥有的权限
         """
-        role = cls.keycloak_utils.get_role_by_id(role_id)
+        role = cls.keycloak_utils().get_role_by_id(role_id)
         # 获取相关policy，并记录其id
-        policies = cls.keycloak_utils.get_keycloak_admin().get_client_authz_policies(cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
+        policies = cls.keycloak_utils().get_keycloak_admin().get_client_authz_policies(cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
         for policy in policies:
             if policy['name'] == role['name']:
                 role['policy_id'] = policy['id']
                 break
         # 获取所有permission
-        all_permissions = cls.keycloak_utils.get_keycloak_admin().get_client_authz_permissions(
+        all_permissions = cls.keycloak_utils().get_keycloak_admin().get_client_authz_permissions(
             cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
         ps = [{'name': d['name'], 'des': d['description'], 'id': d['id'], 'allow': False} for d in all_permissions if
               d['name'] != 'Default Permission']
         ps = {p['name']: p for p in ps}
         # 获取相关permissions
-        ac_permissions = cls.keycloak_utils.get_permission_by_policy(role['policy_id'])
+        ac_permissions = cls.keycloak_utils().get_permission_by_policy(role['policy_id'])
         for ac_p in ac_permissions:
             ps[ac_p['name']]['allow'] = True
         ps = ps.values()
@@ -1045,9 +1059,9 @@ class KeycloakRoleController:
             'attributes': {'created':[formatted_time, ]},
             'clientRole': True
         }
-        cls.keycloak_utils.get_keycloak_admin().create_client_role(cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT']
+        cls.keycloak_utils().get_keycloak_admin().create_client_role(cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT']
                                                                    , role_payload)
-        role = cls.keycloak_utils.get_keycloak_admin().get_client_role(cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT']
+        role = cls.keycloak_utils().get_keycloak_admin().get_client_role(cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT']
                                                                        , role_name)
         policy_payload = {
             "type": "role",
@@ -1061,7 +1075,7 @@ class KeycloakRoleController:
                 }
             ]
         }
-        cls.keycloak_utils.get_keycloak_admin().create_client_authz_role_based_policy(
+        cls.keycloak_utils().get_keycloak_admin().create_client_authz_role_based_policy(
             cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT']
             , policy_payload)
         return role
@@ -1071,15 +1085,15 @@ class KeycloakRoleController:
         """
         删除一个role，在keycloak中基于该role的policy会自动被删除
         """
-        return cls.keycloak_utils.delete_client_role_by_id(role_id)
+        return cls.keycloak_utils().delete_client_role_by_id(role_id)
 
     @classmethod
     def assign_role_users(cls, role_id: str, user_id: str):
         """
         将一个用户纳入角色
         """
-        role = cls.keycloak_utils.get_role_by_id(role_id)
-        cls.keycloak_utils.get_keycloak_admin().assign_client_role(user_id, cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'],
+        role = cls.keycloak_utils().get_role_by_id(role_id)
+        cls.keycloak_utils().get_keycloak_admin().assign_client_role(user_id, cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'],
                                                                    role)
 
     @classmethod
@@ -1087,8 +1101,8 @@ class KeycloakRoleController:
         """
         将一个用户移除角色
         """
-        role = cls.keycloak_utils.get_role_by_id(role_id)
-        cls.keycloak_utils.get_keycloak_admin().delete_client_roles_of_user(user_id, cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'],
+        role = cls.keycloak_utils().get_role_by_id(role_id)
+        cls.keycloak_utils().get_keycloak_admin().delete_client_roles_of_user(user_id, cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'],
                                                                             role)
 
     @classmethod
@@ -1098,22 +1112,25 @@ class KeycloakRoleController:
         """
         # 1.获取permissions
         permissions = list()
-        ps = cls.keycloak_utils.get_keycloak_admin().get_client_authz_permissions(
+        ps = cls.keycloak_utils().get_keycloak_admin().get_client_authz_permissions(
             cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
         for p in ps:
             if p['id'] in permission_ids:
                 permissions.append(p)
         # 2.获取所有permission相关的resources的id
+        # resources = [[r['_id']] for p_id in permission_ids for r in
+        #              cls.keycloak_utils().get_resources_by_permission(p_id)]
         resources = list()
         for p_id in permission_ids:
-            resources.append(list(map(lambda r: r['_id'], cls.keycloak_utils.get_resources_by_permission(p_id))))
+            resources.append(list(map(lambda r: r['_id'], cls.keycloak_utils().get_resources_by_permission(p_id))))
         # 3.获取所有permission相关policy的id
+        # policies = [[p['id']] for p_id in permission_ids for p in cls.keycloak_utils().get_policy_by_permission(p_id)]
         policies = list()
         for p_id in permission_ids:
-            policies.append(list(map(lambda p: p['id'], cls.keycloak_utils.get_policy_by_permission(p_id))))
+            policies.append(list(map(lambda p: p['id'], cls.keycloak_utils().get_policy_by_permission(p_id))))
         # 4.通过role id获取需要被更更改的 policyid
         policy_id = None
-        pos = cls.keycloak_utils.get_keycloak_admin().get_client_authz_policies(
+        pos = cls.keycloak_utils().get_keycloak_admin().get_client_authz_policies(
             cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
         for po in pos:
             if po['type'] == 'role':
@@ -1121,31 +1138,31 @@ class KeycloakRoleController:
                     policy_id = po['id']
                     break
         # 5.构建payload
-        for i in range(len(permissions)):
-            payload = permissions[i]
-            payload['resources'] = resources[i]
+        for permission, resource, policy in zip(permissions, resources, policies):
+            payload = permission
+            payload['resources'] = resource
             # 6.如不存在policy则增，反之
-            payload['policies'] = policies[i]
+            payload['policies'] = policy
             if policy_id in payload['policies']:
                 payload['policies'].remove(policy_id)
             else:
                 payload['policies'].append(policy_id)
             payload['scopes'] = []
-            cls.keycloak_utils.update_permission(permission_ids[i], payload)
+            cls.keycloak_utils().update_permission(permission['id'], payload)
 
     @classmethod
     def edit_role(cls, role_id: str, des : str):
         """
         编辑角色的描述
         """
-        roles = cls.keycloak_utils.get_keycloak_admin().get_client_roles(cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
+        roles = cls.keycloak_utils().get_keycloak_admin().get_client_roles(cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
         role = None
         for r in roles:
             if r['id'] == role_id:
                 role = r
                 break
         role['description'] = des
-        cls.keycloak_utils.get_keycloak_admin().update_client_role(cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'],
+        cls.keycloak_utils().get_keycloak_admin().update_client_role(cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'],
                                                                    role['name'],
                                                                    role)
 
@@ -1155,12 +1172,19 @@ class KeycloakPermissionController:
     权限操作
     '''
 
-    keycloak_utils: KeycloakUtils = KeycloakUtils()
+    # keycloak_utils: KeycloakUtils = KeycloakUtils()
+    _keycloak_utils = None
+
+    @classmethod
+    def keycloak_utils(cls):
+        if cls._keycloak_utils is None:
+            cls._keycloak_utils = KeycloakUtils()
+        return cls._keycloak_utils
     _settings = LazySettings()
 
     @classmethod
     def get_all_permissions(cls):
-        return cls.keycloak_utils.get_keycloak_admin().get_client_authz_permissions(
+        return cls.keycloak_utils().get_keycloak_admin().get_client_authz_permissions(
             cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
 
     @classmethod
@@ -1169,11 +1193,11 @@ class KeycloakPermissionController:
         获取token持有者所拥有的权限
         '''
         # 获取所有权限
-        all_permissions = cls.keycloak_utils.get_keycloak_admin().get_client_authz_permissions(
+        all_permissions = cls.keycloak_utils().get_keycloak_admin().get_client_authz_permissions(
             cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
         ps = [{'name': d['name'], 'des': d['description'], 'id':d['id'], 'allow': False} for d in all_permissions if d['name'] != 'Default Permission']
         try:
-            allow_p = cls.keycloak_utils.get_keycloak_openid().uma_permissions(token)
+            allow_p = cls.keycloak_utils().get_keycloak_openid().uma_permissions(token)
             p_list = [d['rsname'] for d in allow_p]
             for permission in ps:
                 if permission['name'] in p_list:
@@ -1192,7 +1216,7 @@ class KeycloakPermissionController:
     @classmethod
     def has_permissions(cls, token: str, permission_name: str) -> bool:
         try:
-            cls.keycloak_utils.get_keycloak_openid().uma_permissions(token, permissions= [permission_name, ])
+            cls.keycloak_utils().get_keycloak_openid().uma_permissions(token, permissions= [permission_name, ])
         except Exception as e:
             return False
         return True
