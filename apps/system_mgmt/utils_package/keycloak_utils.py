@@ -22,17 +22,28 @@ class KeycloakUtils:
     def __init__(self):
         self.__get_client_settings__()
         self.__settings = LazySettings()
+        self.__keycloak_admin = KeycloakAdmin(
+            server_url=f'http://{self.__settings.KEYCLOAK_SETTINGS["HOST"]}:{self.__settings.KEYCLOAK_SETTINGS["PORT"]}/',
+            username=self.__settings.KEYCLOAK_SETTINGS["ADMIN_USERNAME"],
+            password=self.__settings.KEYCLOAK_SETTINGS["ADMIN_PASSWORD"],
+            realm_name=self.__settings.KEYCLOAK_SETTINGS["REALM_NAME"],
+            user_realm_name='master',
+            client_id="admin-cli")
         self.__keycloak_openid = KeycloakOpenID(
             server_url=f'http://{self.__settings.KEYCLOAK_SETTINGS["HOST"]}:{self.__settings.KEYCLOAK_SETTINGS["PORT"]}/',
             client_id=f'{self.__settings.KEYCLOAK_SETTINGS["CLIENT_ID"]}',
             realm_name=f'{self.__settings.KEYCLOAK_SETTINGS["REALM_NAME"]}',
             client_secret_key=f'{self.__settings.KEYCLOAK_SETTINGS["CLIENT_SECRET_KEY"]}')
         # self.__keycloak_openid.load_authorization_config(self.__settings.KEYCLOAK_SETTINGS["AUTH_INFO_FILE_PATH"])
-        self.__admin_token: str = None
-        self.__keycloak_admin: KeycloakAdmin = None
-        self.__refresh_keycloak_admin__()
+        self.__admin_token: str = self.__keycloak_admin.token['access_token']
+        # self.__keycloak_admin: KeycloakAdmin = None
+        # self.__refresh_keycloak_admin__()
         # 获取权限配置文件
         auth_json = self.__keycloak_admin.get_client_authz_settings(self.__settings.KEYCLOAK_SETTINGS["ID_OF_CLIENT"])
+        # # 为没有applyPolicies的添加一个空列表，否则会报错
+        # for p in auth_json['policies']:
+        #     if p['config'].get('applyPolicies', None) is None:
+        #         p['config']['applyPolicies'] = '[]'
         json_str = json.dumps(auth_json)
         with tempfile.NamedTemporaryFile(mode='w+', delete=False) as temp_file:
             temp_file.write(json_str)
@@ -88,11 +99,11 @@ class KeycloakUtils:
         获取keycloak_admin
         如果失效了重新获取
         '''
-        try:
-            if not self.__keycloak_openid.introspect(self.__admin_token).get('active', False):
-                raise Exception('invalid admin token')
-        except Exception as e:
-            self.__refresh_keycloak_admin__()
+        # try:
+        #     if not self.__keycloak_openid.introspect(self.__admin_token).get('active', False):
+        #         raise Exception('invalid admin token')
+        # except Exception as e:
+        #     self.__refresh_keycloak_admin__()
         return self.__keycloak_admin
 
     def update_permission(self, permission_id: str, payload: dict):

@@ -455,10 +455,7 @@ class InstPermissionsInitData(object):
 def init_keycloak(**kwargs):
     """
     初始化keycloak
-    1. 创建client
-    2. 创建client role: admin 和 normal
     """
-    # TODO 初始化keycloak
     settings = LazySettings()
     keycloak_admin = KeycloakAdmin(
         server_url=f'http://{settings.KEYCLOAK_SETTINGS["HOST"]}:{settings.KEYCLOAK_SETTINGS["PORT"]}/',
@@ -468,7 +465,7 @@ def init_keycloak(**kwargs):
         client_id="admin-cli")
     # 读realm配置文件
     realm_config_file_path = os.path.join(settings.BASE_DIR, 'config', 'realm-export-weops.json')
-    with open(realm_config_file_path, 'r') as realm_config_file:
+    with open(realm_config_file_path, 'r', encoding='utf8') as realm_config_file:
         realm_config = json.load(realm_config_file)
     if realm_config['realm'] != settings.KEYCLOAK_SETTINGS["REALM_NAME"]:
         raise ValueError(f'keycloak initialization error: realm name in file {realm_config_file_path} should '
@@ -491,9 +488,14 @@ def init_keycloak(**kwargs):
         client_id="admin-cli",
         user_realm_name="master")
 
-    # TODO 可能有问题，用到了动态配置
+    #动态获取client配置
+    clients = keycloak_admin.get_clients()
+    for client in clients:
+        if client['clientId'] == settings.KEYCLOAK_SETTINGS["CLIENT_ID"]:
+            settings.KEYCLOAK_SETTINGS["ID_OF_CLIENT"] = client['id']
+            settings.KEYCLOAK_SETTINGS["CLIENT_SECRET_KEY"] = client['secret']
+    # 创建admin用户和普通用户
     admin_role = keycloak_admin.get_client_role(settings.KEYCLOAK_SETTINGS["ID_OF_CLIENT"], 'admin')
-
     admin_user = {
         'username': 'admin',
         'credentials': [{"value": 'admin', "type": 'password', }],
@@ -501,3 +503,16 @@ def init_keycloak(**kwargs):
         'lastName': '管理员',
         'enabled': True
     }
+    admin_id = keycloak_admin.create_user(admin_user)
+    keycloak_admin.assign_client_role(admin_id, settings.KEYCLOAK_SETTINGS["ID_OF_CLIENT"], admin_role)
+
+    normal_role = keycloak_admin.get_client_role(settings.KEYCLOAK_SETTINGS["ID_OF_CLIENT"], 'normal')
+    normal_user = {
+        'username': 'normal_user',
+        'credentials': [{"value": 'normal_user', "type": 'password', }],
+        'email': 'normal@kc.com',
+        'lastName': '普通用户',
+        'enabled': True
+    }
+    normal_id = keycloak_admin.create_user(normal_user)
+    keycloak_admin.assign_client_role(normal_id, settings.KEYCLOAK_SETTINGS["ID_OF_CLIENT"], normal_role)

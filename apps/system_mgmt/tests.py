@@ -18,28 +18,28 @@ import uuid
 import json
 
 class PythonKeycloakTest(unittest.TestCase):
-    def setUp(self):
-        self.username = 'admin'
-        self.password = 'admin'
-        self.id_of_client = 'a72a5bed-8673-48e1-ac0a-97ba3c06c88f'
-        self.keycloak_openid = KeycloakOpenID(
-            server_url=f'http://localhost:8080/',
-            client_id=f'weops_lite',
-            realm_name=f'master',
-            client_secret_key=f'UQym8RIjp4X4hxMxIkL1hOktVU1auDa3')
-        self.token = self.keycloak_openid.token(self.username, self.password)
-
-        self.keycloak_connection = KeycloakOpenIDConnection(
-            server_url=f'http://localhost:8080/',
-            realm_name=f'master',
-            client_id=f'weops_lite',
-            client_secret_key=f'UQym8RIjp4X4hxMxIkL1hOktVU1auDa3',
-            custom_headers={
-                "Authorization": f"Bearer {self.token['access_token']}"
-            },
-            verify=True)
-        self.keycloak_admin = KeycloakAdmin(connection=self.keycloak_connection)
-        print("Setting up the test environment")
+    # def setUp(self):
+    #     self.username = 'admin'
+    #     self.password = 'admin'
+    #     self.id_of_client = 'a72a5bed-8673-48e1-ac0a-97ba3c06c88f'
+    #     self.keycloak_openid = KeycloakOpenID(
+    #         server_url=f'http://localhost:8080/',
+    #         client_id=f'weops_lite',
+    #         realm_name=f'master',
+    #         client_secret_key=f'UQym8RIjp4X4hxMxIkL1hOktVU1auDa3')
+    #     self.token = self.keycloak_openid.token(self.username, self.password)
+    #
+    #     self.keycloak_connection = KeycloakOpenIDConnection(
+    #         server_url=f'http://localhost:8080/',
+    #         realm_name=f'master',
+    #         client_id=f'weops_lite',
+    #         client_secret_key=f'UQym8RIjp4X4hxMxIkL1hOktVU1auDa3',
+    #         custom_headers={
+    #             "Authorization": f"Bearer {self.token['access_token']}"
+    #         },
+    #         verify=True)
+    #     self.keycloak_admin = KeycloakAdmin(connection=self.keycloak_connection)
+    #     print("Setting up the test environment")
 
     def test_method(self):
         userinfo = self.keycloak_openid.userinfo(self.token['access_token'])
@@ -86,9 +86,10 @@ class PythonKeycloakTest(unittest.TestCase):
                                        realm_name="weops",
                                        client_id="admin-cli",
                                        user_realm_name='master')
-        with open(r'D:\Projectes\weops-framework\config\realm-export.json', 'r', encoding='utf8') as realm_config_file:
-            realm_config = json.load(realm_config_file)
-        clients = keycloak_admin.get_clients()
+        token = keycloak_admin.token
+        # with open(r'D:\Projectes\weops-framework\config\realm-export.json', 'r', encoding='utf8') as realm_config_file:
+        #     realm_config = json.load(realm_config_file)
+        # clients = keycloak_admin.get_clients()
         pass
 
     def test_create_role(self):

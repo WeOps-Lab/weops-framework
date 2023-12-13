@@ -89,7 +89,7 @@ LOGIN_REDIRECT_URL = '/admin/' if LOGIN_METHOD == "local" else '/keycloak_login/
 KEYCLOAK_SETTINGS = {
     "HOST" : os.environ.get("BKAPP_KEYCLOAK_SERVER_URL", "keycloak-container"),
     "PORT" : os.environ.get("BKAPP_KEYCLOAK_SERVER_URL", "8080"),
-    "REALM_NAME" : os.environ.get("BKAPP_REALM_NAME", "master"),
+    "REALM_NAME" : os.environ.get("BKAPP_REALM_NAME", "weops"),
     "CLIENT_ID" : os.environ.get("BKAPP_CLIENT_ID", "weops_lite"),
     "ID_OF_CLIENT" :  os.environ.get("BKAPP_ID_OF_CLIENT", ""),
     "CLIENT_SECRET_KEY" : os.environ.get("BKAPP_CLIENT_SECRET_KEY", ""),

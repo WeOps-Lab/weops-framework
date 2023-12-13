@@ -35,12 +35,8 @@ class KeycloakTokenAuthentication(BaseAuthentication):
 
     def authenticate_credentials(self, token: str):
         tokeninfo = self.__keycloak_util.get_keycloak_openid().introspect(token)
-        user = self.__keycloak_util.get_user_detail(tokeninfo['sub'])
-        user['resource_access'] = tokeninfo['resource_access']
-        # tokeninfo['email'] = user['email']
         if not tokeninfo.get('active', False):
             raise AuthenticationFailed('Token exp or invalid')
-        # 根据token找对应的user
-        # setattr(tokeninfo, 'username', tokeninfo['username'])
-        # setattr(tokeninfo, 'is_authenticated', True)
+        user = self.__keycloak_util.get_user_detail(tokeninfo['sub'])
+        user['resource_access'] = tokeninfo['resource_access']
         return user, token

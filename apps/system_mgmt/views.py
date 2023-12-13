@@ -404,14 +404,14 @@ class KeycloakLoginView(views.APIView):
         if username is None or password is None:
             return Response({'detail': 'username or password are not present!'}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            token, refresh_token = KeycloakUserController.get_token(username, password)
+            token = KeycloakUserController.get_token(username, password)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_401_UNAUTHORIZED)
         if token is None:
             # 用户验证失败，返回错误响应
             return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
         else:
-            return Response({'token': token, 'refresh_token': refresh_token}, status=status.HTTP_200_OK)
+            return Response({'token': token}, status=status.HTTP_200_OK)
 
 
 class KeycloakUserViewSet(viewsets.ViewSet):
@@ -567,7 +567,10 @@ class KeycloakRoleViewSet(viewsets.ViewSet):
         '''
         获取指定角色，以及其拥有的权限
         '''
-        res = KeycloakRoleController.get_client_roles_permissions_by_id(pk)
+        try:
+            res = KeycloakRoleController.get_client_roles_permissions_by_id(pk)
+        except Exception as e:
+            return Response({'error', str(e)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(res)
 
     @swagger_auto_schema(
