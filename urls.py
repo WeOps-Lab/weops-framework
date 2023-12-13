@@ -29,7 +29,7 @@ from apps.system_mgmt.views import (
     SysSettingViewSet,
     SysUserViewSet,
     UserManageViewSet,
-    KeyCloakViewSet,
+    KeycloakUserViewSet,
 )
 
 urlpatterns = [
@@ -70,19 +70,19 @@ schema_view = get_schema_view(
         license=openapi.License(name="BSD License"),
     ),
     public=True,
-    permission_classes=(permissions.AllowAny,),
+    authentication_classes=tuple(),
+    permission_classes=tuple(),
 )
 
 urlpatterns += [
-    url(r'^swagger/$', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
-    url('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+    path('swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
+    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
 ]
 
 urlpatterns += [
     # 系统管理
     url(r"^system/mgmt/", include("apps.system_mgmt.urls")),
-
-
 ]
 
 urlpatterns += [url(r"^docs/$", schema_view)]
@@ -100,23 +100,23 @@ router = SimpleRouter()
 
 # 3.5版本用户管理
 
-router.register(r"system/mgmt/user_keycloak", KeyCloakViewSet, basename="keycloak-user")
+# router.register(r"system/mgmt/user_keycloak", KeyCloakViewSet, basename="keycloak-user")
 
-router.register(r"system/mgmt/user_manage", UserManageViewSet, basename="sys-user")
+# router.register(r"system/mgmt/user_manage", UserManageViewSet, basename="sys-user")
 
 # 3.5版本角色管理
-router.register(r"system/mgmt/role_manage", RoleManageViewSet, basename="sys-role")
-
+# router.register(r"system/mgmt/role_manage", RoleManageViewSet, basename="sys-role")
+#
 router.register(r"system/mgmt/menu_manage", MenuManageModelViewSet, basename="sys-menu")
-
-router.register(r"system/mgmt/inst_permissions", InstancesPermissionsModelViewSet, basename="sys-permissions")
+#
+# router.register(r"system/mgmt/inst_permissions", InstancesPermissionsModelViewSet, basename="sys-permissions")
 
 # 系统用户操作
-router.register(r"system/mgmt/sys_users", SysUserViewSet, basename="sys-user")
+# router.register(r"system/mgmt/sys_users", SysUserViewSet, basename="sys-user")
 # 系统操作日志
 router.register(r"system/mgmt/operation_log", OperationLogViewSet, basename="sys-log")
 # 系统配置
-router.register(r"system/mgmt/sys_setting", SysSettingViewSet, basename="sys-setting")
+# router.register(r"system/mgmt/sys_setting", SysSettingViewSet, basename="sys-setting")
 
 urlpatterns += router.urls
 
