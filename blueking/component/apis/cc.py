@@ -41,6 +41,18 @@ class CollectionsCC(object):
             path="/api/c/compapi{bk_api_ver}/cc/batch_delete_inst/",
             description=u"批量删除实例",
         )
+        self.batch_create_inst = ComponentAPI(
+            client=self.client,
+            method="POST",
+            path="/api/c/compapi{bk_api_ver}/cc/batch_create_inst/",
+            description=u"批量创建实例",
+        )
+        self.batch_create_instance_association = ComponentAPI(
+            client=self.client,
+            method="POST",
+            path="/api/c/compapi{bk_api_ver}/cc/batch_create_instance_association/",
+            description=u"批量创建实例关联关系",
+        )
         self.batch_delete_set = ComponentAPI(
             client=self.client,
             method="POST",
