@@ -83,8 +83,8 @@ urlpatterns += [
 urlpatterns += [
     # 系统管理
     url(r"^system/mgmt/", include("apps.system_mgmt.urls")),
-    # 系统日志
-    url(r"^syslog/", include("apps.syslog.urls")),
+    # # 系统日志
+    # url(r"^syslog/", include("apps.syslog.urls")),
 ]
 
 urlpatterns += [url(r"^docs/$", schema_view)]
