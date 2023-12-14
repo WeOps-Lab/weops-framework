@@ -1,0 +1,25 @@
+# ============================== Auditbeat modules ==============================
+{% if fileintegrity %}
+#----------------------------- Fileintegrity Module -----------------------------
+auditbeat.modules:
+- module: file_integrity
+  paths: {{ fileintegrity.paths }}
+{% endif %}
+{% if system %}
+#------------------------------- System Module -------------------------------
+auditbeat.modules:
+- module: system
+  datasets: {{ system.datasets }}  
+  period: {{ system.period }}
+  state.period: {{ system.state.period }}
+{% endif %}
+# ============================== Filebeat outputs ===============================
+output.kafka:
+  hosts: {{ log_output_host }}
+  topic: 'auditbeat'
+  compression: gzip
+# ================================= Processors =================================
+processors:
+- add_host_metadata: ~
+- add_cloud_metadata: ~
+- add_docker_metadata: ~

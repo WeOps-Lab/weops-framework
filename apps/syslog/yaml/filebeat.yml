@@ -1,0 +1,221 @@
+# ============================== Filebeat inputs ===============================
+filebeat.inputs:
+{% if filestream %}
+- type: filestream
+  id: filestream-01
+  enabled: true
+  paths: {{ filestream.paths }}
+  {% if filestream.multiline.enabled %}
+  parsers:
+    - multiline:
+        type: pattern
+        pattern: {{ filestream.multiline.pattern }}
+        match: after
+  {% endif %}
+{% endif %}
+# ============================== Filebeat modules ==============================
+filebeat.config.modules:
+{% if activemq %}
+#------------------------------- ActiveMQ Module -------------------------------
+- module: activemq
+  {% if activemq.audit.enabled %}
+  audit:
+    enabled: true
+    var.paths: {{ activemq.audit.paths }}
+  {% endif %}
+  {% if activemq.log.enabled %}
+  log:
+    enabled: true
+    var.paths: {{ activemq.log.paths }}
+  {% endif %}
+{% endif %}
+{% if apache %}
+#-------------------------------- Apache Module --------------------------------
+- module: apache
+  {% if apache.error.enabled %}
+  error:
+    enabled: true
+    var.paths: {{ apache.error.paths }}
+  {% endif %}
+  {% if apache.access.enabled %}
+  access:
+    enabled: true
+    var.paths: {{ apache.access.paths }}
+  {% endif %}
+{% endif %}
+{% if coredns %}
+#------------------------------- Coredns Module -------------------------------
+- module: coredns
+  {% if coredns.log.enabled %}
+  log:
+    enabled: true
+    var.paths: {{ coredns.log.paths }}
+  {% endif %}
+{% endif %}
+{% if elasticsearch %}
+#---------------------------- Elasticsearch Module ----------------------------
+- module: elasticsearch
+  {% if elasticsearch.server.enabled %}
+  server:
+    enabled: true
+    var.paths: {{ elasticsearch.server.paths }}
+  {% endif %}
+  {% if elasticsearch.gc.enabled %}
+  gc:
+    enabled: true
+    var.paths: {{ elasticsearch.gc.paths }}
+  {% endif %}
+  {% if elasticsearch.audit.enabled %}
+  audit:
+    enabled: true
+    var.paths: {{ elasticsearch.audit.paths }}
+  {% endif %}
+  {% if elasticsearch.slowlog.enabled %}
+  slowlog:
+    enabled: true
+    var.paths: {{ elasticsearch.slowlog.paths }}
+  {% endif %}
+  {% if elasticsearch.deprecation.enabled %}
+  deprecation:
+    enabled: true
+    var.paths: {{ elasticsearch.deprecation.paths }}
+  {% endif %}
+{% endif %}
+{% if iis %}
+#--------------------------------- IIS Module ---------------------------------
+- module: iis
+  {% if iis.error.enabled %}
+  error:
+    enabled: true
+    var.paths: {{ iis.error.paths }}
+  {% endif %}
+  {% if iis.access.enabled %}
+  access:
+    enabled: true
+    var.paths: {{ iis.access.paths }}
+  {% endif %}
+{% endif %}
+{% if kafka %}
+#-------------------------------- Kafka Module --------------------------------
+- module: kafka
+  {% if kafka.log.enabled %}
+  log:
+    enabled: true
+    var.paths: {{ kafka.log.paths }}
+  {% endif %}
+{% endif %}
+{% if mongodb %}
+#------------------------------- Mongodb Module -------------------------------
+- module: mongodb
+  {% if mongodb.log.enabled %}
+  log:
+    enabled: true
+    var.paths: {{ mongodb.log.paths }}
+  {% endif %}
+{% endif %}
+{% if mssql %}
+#-------------------------------- Mssql Module --------------------------------
+- module: mssql
+  {% if mssql.log.enabled %}
+  log:
+    enabled: true
+    var.paths: {{ mssql.log.paths }}
+  {% endif %}
+{% endif %}
+{% if mysql %}
+#-------------------------------- MySQL Module --------------------------------
+- module: mysql
+  {% if mysql.error.enabled %}
+  error:
+    enabled: true
+    var.paths: {{ mysql.error.paths }}
+  {% endif %}
+  {% if mysql.slowlog.enabled %}
+  slowlog:
+    enabled: true
+    var.paths: {{ mysql.slowlog.paths }}
+  {% endif %}
+{% endif %}
+{% if nginx %}
+#-------------------------------- Nginx Module --------------------------------
+- module: nginx
+  {% if nginx.error.enabled %}
+  error:
+    enabled: true
+    var.paths: {{ nginx.error.paths }}
+  {% endif %}
+  {% if nginx.access.enabled %}
+  access:
+    enabled: true
+    var.paths: {{ nginx.access.paths }}
+  {% endif %}
+{% endif %}
+{% if oracle %}
+#-------------------------------- Oracle Module --------------------------------
+- module: oracle
+  {% if oracle.audit.enabled %}
+  audit:
+    enabled: true
+    var.paths: {{ oracle.audit.paths }}
+  {% endif %}
+{% endif %}
+{% if postgresql %}
+#------------------------------ PostgreSQL Module ------------------------------
+- module: postgresql
+  {% if postgresql.log.enabled %}
+  log:
+    enabled: true
+    var.paths: {{ postgresql.log.paths }}
+  {% endif %}
+{% endif %}
+{% if rabbitmq %}
+#------------------------------- RabbitMQ Module -------------------------------
+- module: rabbitmq
+  {% if rabbitmq.log.enabled %}
+  log:
+    enabled: true
+    var.paths: {{ rabbitmq.log.paths }}
+  {% endif %}
+{% endif %}
+{% if redis %}
+#-------------------------------- Redis Module --------------------------------
+- module: redis
+  {% if redis.log.enabled %}
+  log:
+    enabled: true
+    var.paths: {{ redis.log.paths }}
+  {% endif %}
+{% endif %}
+{% if tomcat %}
+#----------------------------Tomcat Module ------------------------------------
+- module: tomcat
+  {% if tomcat.log.enabled %}
+  log:
+    enabled: true
+    var.paths: {{ tomcat.log.paths }}
+  {% endif %}
+{% endif %}
+{% if zookeeper %}
+#------------------------------ ZooKeeper Module ------------------------------
+- module: zookeeper
+  {% if zookeeper.audit.enabled %}
+  audit:
+    enabled: true
+    var.paths: {{ zookeeper.audit.paths }}
+  {% endif %}
+  {% if zookeeper.log.enabled %}
+  log:
+    enabled: true
+    var.paths: {{ zookeeper.log.paths }}
+  {% endif %}
+{% endif %}
+# ============================== Filebeat outputs ===============================
+output.kafka:
+  hosts: {{ log_output_host }}
+  topic: 'filebeat'
+  compression: gzip
+# ================================= Processors =================================
+processors:
+  - add_host_metadata: ~
+  - add_cloud_metadata: ~
+  - add_docker_metadata: ~

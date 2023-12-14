@@ -1,0 +1,30 @@
+# ======================== Winlogbeat specific options =========================
+winlogbeat.event_logs:
+{% if application %}
+#------------------------------- Application Module -------------------------------
+- name: Application
+  ignore_older: {{ application.ignore_older }}
+  event_id: {{ application.event_id }}
+{% endif %}
+{% if security %}
+#------------------------------- Security Module -------------------------------
+- name: Security
+  ignore_older: {{ security.ignore_older }}
+  event_id: {{ security.event_id }}
+{% endif %}
+{% if system %}
+#------------------------------- Sysmon Module -------------------------------
+- name: System
+  ignore_older: {{ system.ignore_older }}
+  event_id: {{ system.event_id }}
+{% endif %}
+# ============================== Winlogbeat outputs ===============================output.
+output.kafka:
+  hosts: {{ log_output_host }}
+  topic: 'winlogbeat'
+  compression: gzip
+# ================================= Processors =================================
+processors:
+  - add_host_metadata: ~
+  - add_cloud_metadata: ~
+  - add_docker_metadata: ~

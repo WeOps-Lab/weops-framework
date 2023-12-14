@@ -1,0 +1,59 @@
+#========================== Metricbeat Modules =============================
+metricbeat.modules:
+{% if system %}
+#-------------------------------- System Module --------------------------------
+- module: system
+  enabled: {{ system.metri.enabled }}
+  metricsets: {{ system.metri.metricsets }}
+  period: {{ system.metri.period }}
+  processes: {{ system.metri.processes }}
+ {% endif %}
+ {% if window %}
+#------------------------------- Windows Module -------------------------------
+- module: windows
+  metricsets: ["perfmon"]
+  enabled: {{ window.perfmon.metri.enabled }}
+  period: {{ window.perfmon.metri.period }}
+  perfmon.ignore_non_existent_counters: {{ window.perfmon.metri.perfmon.ignore }}
+  perfmon.group_measurements_by_instance: {{ window.perfmon.metri.perfmon.group }}
+  perfmon.queries:
+    - object: {{ window.perfmon.queries.object }}
+      instance: ["*"]
+      counters:
+        - name: {{ window.perfmon.queries.counters.name }}
+          field: {{ window.perfmon.queries.counters.field }}
+          format: {{ window.perfmon.queries.counters.format }}
+- module: windows
+  metricsets: ["service"]
+  enabled: {{ window.service.metri.enabled }}
+  period: {{ window.service.metri.period }}
+{% endif %}
+{% if linux %}
+#-------------------------------- Linux Module --------------------------------
+- module: linux
+  enabled: {{ linux.metri.enabled }}
+  metricsets: {{ linux.metri.metricsets }}
+  period: {{ linux.metri.period }}
+{% endif %}
+{% if docker %}
+#-------------------------------- Docker Module --------------------------------
+- module: docker
+  enabled: {{ docker.metri.enabled }}
+  metricsets: {{ docker.metri.metricsets }}
+  hosts: {{ docker.metri.hosts }}
+  period: {{ docker.metri.period }}
+ {% endif %}
+# ============================== Filebeat outputs ===============================
+output.kafka:
+  hosts: ["localhost:9092"]
+  topic: beats
+  compression: gzip
+# ================================= Processors =================================
+processors:
+  - add_host_metadata: ~
+  - add_cloud_metadata: ~
+  - add_docker_metadata: ~
+  - add_kubernetes_metadata: ~
+
+
+

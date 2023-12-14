@@ -1,0 +1,145 @@
+# =============================== Network device ===============================
+packetbeat.interfaces.device: any
+packetbeat.interfaces.poll_default_route: 1m
+packetbeat.interfaces.internal_networks:
+  - private
+# =================================== Flows ====================================
+packetbeat.flows:
+  timeout: 30s
+  period: 10s
+# =========================== Transaction protocols ============================
+packetbeat.protocols:
+{% if icmp %}
+#------------------------------- ICMP Type-------------------------------
+- type: icmp
+  {% if icmp.enabled %}
+    enabled: true
+  {% endif %}
+{% endif %}
+{% if amqp %}
+#------------------------------- AMQP Type-------------------------------
+- type: amqp
+  {% if amqp.enabled %}
+    enabled: true
+    ports: {{amqp.ports}}
+  {% endif %}
+{% endif %}
+{% if dns %}
+#------------------------------- DNS Type--------------------------------
+- type: dns
+  {% if dns.enabled %}
+    enabled: true
+    ports: {{dns.ports}}
+  {% endif %}
+{% endif %}
+#------------------------------- Cassandra Type -------------------------------
+{% if cassandra %}
+- type: cassandra
+  {% if cassandra.enabled %}
+    enabled: true
+    ports: {{cassandra.ports}}
+  {% endif %}
+{% endif %}
+{% if dhcpv4 %}
+#------------------------------- DHCPv4 Type -------------------------------
+- type: dhcpv4
+  {% if dhcpv4.enabled %}
+    enabled: true
+    ports: {{dhcpv4.ports}}
+  {% endif %}
+{% endif %}
+{% if http %}
+#------------------------------- HTTP Type -------------------------------
+- type: http
+  {% if http.enabled %}
+    enabled: true
+    ports: {{http.ports}}
+  {% endif %}
+{% endif %}
+{% if memcache %}
+#------------------------------- Memcache Type -------------------------------
+- type: memcache
+  {% if memcache.enabled %}
+    enabled: true
+    ports: {{memcache.ports}}
+  {% endif %}
+{% endif %}
+{% if mongodb %}
+#------------------------------- MongoDB Type ---------------------------------
+- type: mongodb
+  {% if mongodb.enabled %}
+    enabled: true
+    ports: {{mongodb.ports}}
+  {% endif %}
+{% endif %}
+{% if mysql %}
+#-------------------------------- MySQL Type --------------------------------
+- type: mysql
+  {% if mysql.enabled %}
+    enabled: true
+    ports: {{mysql.ports}}
+  {% endif %}
+{% endif %}
+{% if pgsql %}
+#------------------------------- PostgreSQL Type -------------------------------
+- type: pgsql
+  {% if pgsql.enabled %}
+    enabled: true
+    ports: {{pgsql.ports}}
+  {% endif %}
+{% endif %}
+{% if redis %}
+#-------------------------------- Redis Type --------------------------------
+- type: redis
+  {% if redis.enabled %}
+    enabled: true
+    ports: {{redis.ports}}
+  {% endif %}
+{% endif %}
+{% if thrift %}
+#-------------------------------- Thrift Type --------------------------------
+- type: thrift
+  {% if thrift.enabled %}
+    enabled: true
+    ports: {{thrift.ports}}
+  {% endif %}
+{% endif %}
+{% if nfs %}
+#-------------------------------- NFC Type --------------------------------
+- type: nfs
+  {% if nfs.enabled %}
+    enabled: true
+    ports: {{nfs.ports}}
+  {% endif %}
+{% endif %}
+{% if tls %}
+#-------------------------------- TLS Type --------------------------------
+- type: tls
+  {% if tls.enabled %}
+    enabled: true
+    ports: {{tls.ports}}
+  {% endif %}
+{% endif %}
+{% if sip %}
+#-------------------------------- SIP Type --------------------------------
+- type: sip
+  {% if sip.enabled %}
+    enabled: true
+    ports: {{sip.ports}}
+  {% endif %}
+{% endif %}
+# ======================= Elasticsearch template setting =======================
+setup.template.settings:
+  index.number_of_shards: 1
+  #index.codec: best_compression
+  #_source.enabled: false
+# ================================== Outputs ===================================
+output.kafka:
+  hosts: {{ log_output_host }}
+  topic: 'packetbeat'
+  compression: gzip
+# ================================= Processors =================================
+processors:
+  - add_host_metadata: ~
+  - add_cloud_metadata: ~
+  - add_docker_metadata: ~
