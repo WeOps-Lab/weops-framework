@@ -46,8 +46,16 @@ services:
       context: .
     ports:
       - "8000:8000"
+    restart: unless-stopped
+    # 覆盖dockerfile中的CMD指令
+    command: bash -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
     volumes:
       - .:/app
+    depends_on:
+      - mysql
+      - redis
+      - casbin-mesh
+      - keycloak
 
 #networks:
 #  default:
