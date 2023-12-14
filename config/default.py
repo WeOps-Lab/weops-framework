@@ -96,6 +96,8 @@ KEYCLOAK_SETTINGS = {
     "ADMIN_USERNAME" : os.environ.get("BKAPP_ADMIN_USERNAME", "admin"),
     "ADMIN_PASSWORD" : os.environ.get("BKAPP_ADMIN_USERNAME", "admin")
 }
+# syslog依赖的配置
+FILE_PATH = os.environ.get("BKAPP_FILE_UPLOAD_PATH", "/data/bkce/public/paas_agent/share/weops_saas/")
 
 
 try:

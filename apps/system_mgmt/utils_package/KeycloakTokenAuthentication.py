@@ -24,7 +24,7 @@ class KeycloakTokenAuthentication(BaseAuthentication):
         '''
         该函数返回的信息会被塞到request的属性user和auth中
         '''
-        auth_header : str = request.headers.get('Authorization', None)
+        auth_header: str = request.headers.get('Authorization', None)
         if not auth_header:
             raise AuthenticationFailed('Authorization header needed')
         header_seps = auth_header.split(' ')
@@ -39,4 +39,18 @@ class KeycloakTokenAuthentication(BaseAuthentication):
             raise AuthenticationFailed('Token exp or invalid')
         user = self.__keycloak_util.get_user_detail(tokeninfo['sub'])
         user['resource_access'] = tokeninfo['resource_access']
-        return user, token
+        user_obj = User(user['username'], True, user)
+        return user_obj, token
+
+
+class User:
+    def __init__(self, username, is_authenticated, data):
+        self.username = username
+        self.is_authenticated = is_authenticated
+        self.data = data
+
+    def __getitem__(self, key):
+        return self.data[key]
+
+    def get(self, key, default=None):
+        return self.data.get(key, default)

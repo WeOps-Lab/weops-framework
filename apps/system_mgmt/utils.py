@@ -503,7 +503,7 @@ def init_keycloak(**kwargs):
         'lastName': '管理员',
         'enabled': True
     }
-    admin_id = keycloak_admin.create_user(admin_user)
+    admin_id = keycloak_admin.create_user(admin_user, exist_ok=True)
     keycloak_admin.assign_client_role(admin_id, settings.KEYCLOAK_SETTINGS["ID_OF_CLIENT"], admin_role)
 
     normal_role = keycloak_admin.get_client_role(settings.KEYCLOAK_SETTINGS["ID_OF_CLIENT"], 'normal')
@@ -514,5 +514,5 @@ def init_keycloak(**kwargs):
         'lastName': '普通用户',
         'enabled': True
     }
-    normal_id = keycloak_admin.create_user(normal_user)
+    normal_id = keycloak_admin.create_user(normal_user, exist_ok=True)
     keycloak_admin.assign_client_role(normal_id, settings.KEYCLOAK_SETTINGS["ID_OF_CLIENT"], normal_role)

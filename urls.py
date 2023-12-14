@@ -83,17 +83,19 @@ urlpatterns += [
 urlpatterns += [
     # 系统管理
     url(r"^system/mgmt/", include("apps.system_mgmt.urls")),
+    # # 系统日志
+    # url(r"^syslog/", include("apps.syslog.urls")),
 ]
 
 urlpatterns += [url(r"^docs/$", schema_view)]
 
-try:
-    from custom_urls import urlpatterns as custom_url
-    urlpatterns += custom_url
-
-except ImportError as e:
-    traceback.print_exc()  # 打印详细的错误信息
-    pass
+# try:
+#     from custom_urls import urlpatterns as custom_url
+#     urlpatterns += custom_url
+#
+# except ImportError as e:
+#     traceback.print_exc()  # 打印详细的错误信息
+#     pass
 
 # 添加视图集路由
 router = SimpleRouter()
