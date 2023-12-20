@@ -58,8 +58,6 @@ MIDDLEWARE = (
     # 蓝鲸静态资源服务
     "whitenoise.middleware.WhiteNoiseMiddleware",
     # Auth middleware
-    "blueapps.account.middlewares.RioLoginRequiredMiddleware",
-    "blueapps.account.middlewares.WeixinLoginRequiredMiddleware",
     "blueapps.account.middlewares.LoginRequiredMiddleware",
     # exception middleware
     "blueapps.core.exceptions.middleware.AppExceptionMiddleware",

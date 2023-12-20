@@ -87,8 +87,8 @@ AUTO_MATE_REDIS_DB = os.environ.get("BKAPP_AUTO_MATE_REDIS_DB", 11)
 LOGIN_METHOD = os.environ.get("BKAPP_LOGIN_METHOD", "keycloak")
 LOGIN_REDIRECT_URL = '/admin/' if LOGIN_METHOD == "local" else '/keycloak_login/'
 KEYCLOAK_SETTINGS = {
-    "HOST" : os.environ.get("BKAPP_KEYCLOAK_SERVER_URL", "keycloak-container"),
-    "PORT" : os.environ.get("BKAPP_KEYCLOAK_SERVER_URL", "8080"),
+    "HOST": os.environ.get("BKAPP_KEYCLOAK_SERVER_URL", "keycloak-container"),
+    "PORT": os.environ.get("BKAPP_KEYCLOAK_SERVER_URL", "8080"),
     "REALM_NAME" : os.environ.get("BKAPP_REALM_NAME", "weops"),
     "CLIENT_ID" : os.environ.get("BKAPP_CLIENT_ID", "weops_lite"),
     "ID_OF_CLIENT" :  os.environ.get("BKAPP_ID_OF_CLIENT", ""),

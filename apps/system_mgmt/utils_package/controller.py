@@ -6,24 +6,19 @@
 
 import copy
 import json
-import logging
-import uuid
+
 from collections import defaultdict
 from datetime import datetime
 
-import requests
 from casbin_adapter.models import CasbinRule
-from django.conf import settings, LazySettings
+from django.conf import LazySettings
 from django.db import transaction
-from keycloak import KeycloakAdmin, KeycloakOpenIDConnection, KeycloakOpenID
 
-# from apps.monitor_mgmt.models import CloudPlatGroup
 from apps.system_mgmt.celery_tasks import (
     sync_casbin_mesh_add_policies,
     sync_casbin_mesh_remove_add_policies,
     sync_casbin_mesh_remove_filter_policies,
     sync_casbin_mesh_remove_policies,
-    sync_role_permissions,
 )
 from apps.system_mgmt.constants import (
     DB_APPS,
@@ -36,78 +31,17 @@ from apps.system_mgmt.constants import (
     MENUS_MAPPING,
     MENUS_REMOVE_CLASSIFICATIONS,
 )
-from apps.system_mgmt.models import OperationLog, SysRole, SysUser
+from apps.system_mgmt.models import OperationLog, SysUser
 from apps.system_mgmt.utils_package.casbin_utils import CasbinUtils
 from apps.system_mgmt.utils_package.dao import RoleModels, UserModels
-from apps.system_mgmt.utils_package.db_utils import RolePermissionUtil, RoleUtils, UserUtils
+from apps.system_mgmt.utils_package.db_utils import RoleUtils, UserUtils
 from apps.system_mgmt.common_utils.menu_service import Menus
-from apps.system_mgmt.common_utils.token import get_bk_token
 from apps.system_mgmt.utils_package.keycloak_utils import KeycloakUtils
 from utils.app_log import logger
 from utils.app_utils import AppUtils
 
 
 class UserController(object):
-    @classmethod
-    def open_create_user(cls, data, manage_api, serializer):
-        with transaction.atomic():
-            sid = transaction.savepoint()
-            try:
-                cookies = {"bk_token": get_bk_token()}
-                normal_role = UserModels.get_normal_user()
-                user_data = UserUtils.formative_user_data(**{"data": data, "normal_role": normal_role})
-                serializer = serializer(data=user_data)
-                serializer.is_valid(raise_exception=True)
-                serializer.save()
-                instance = serializer.instance
-                # 给新增对用户加入普通角色组
-                UserModels.add_many_to_many_field(
-                    **{"instance": instance, "add_data": normal_role, "add_attr": "roles"}
-                )
-                OperationLog.objects.create(
-                    operator="admin",
-                    operate_type=OperationLog.ADD,
-                    operate_obj=data.get("username", ""),
-                    operate_summary="对外开放接口调用，用户管理新增用户:[{}]".format(data.get("username", "")),
-                    current_ip="127.0.0.1",
-                    app_module="系统管理",
-                    obj_type="用户管理",
-                )
-                res = UserUtils.username_manage_add_user(**{"cookies": cookies, "data": data, "manage_api": manage_api})
-            except Exception as user_error:
-                logger.exception("对外开放接口：新增用户调用用户管理接口失败. message={}".format(user_error))
-                res = {"result": False, "data": {}}
-
-            if not res["result"]:
-                # 请求错误，或者创建失败 都回滚
-                transaction.savepoint_rollback(sid)
-                transaction.savepoint_commit(sid)
-                return {"result": False, "data": {}, "message": "创建用户失败! 请联系管理员！"}
-
-            UserModels.user_update_bk_user_id(**{"instance": instance, "bk_user_id": res["data"]["id"]})
-            transaction.savepoint_commit(sid)
-
-        # casbin_mesh 新增用户
-        transaction.on_commit(
-            lambda: sync_casbin_mesh_add_policies(
-                sec="g",
-                ptype="g",
-                rules=[[instance.bk_username, normal_role.role_name]],
-            )
-        )
-
-        try:
-            AppUtils.static_class_call(
-                "apps.monitor_mgmt.uac.utils",
-                "UACHelper",
-                "sync_user",
-                {"cookies": cookies},
-            )
-        except Exception as uac_error:
-            logger.exception("用户管理新增用户调用统一告警同步用户失败.error={}".format(uac_error))
-
-        return {"result": True, "data": {"user_id": instance.id}, "message": "创建用户成功"}
-
     @classmethod
     def open_set_user_roles(cls, data):
         """
@@ -127,20 +61,10 @@ class UserController(object):
             return {"result": False, "data": {}, "message": "无法修改admin用户的角色！"}
 
         old_user_role = set(instance.roles.all().values_list("role_name", flat=True))
-        admin_group = SysRole.objects.get(role_name=DB_SUPER_USER)
-        user_obj_in_admin_group = instance.roles.filter(role_name=DB_SUPER_USER).first()  # 用户是否在超管组内
-        operator = 0  # 0 无修改 1 新增 2 删除
-        if admin_group.id in roles_ids:
-            if not user_obj_in_admin_group:
-                operator = 1
-        else:
-            if user_obj_in_admin_group:
-                operator = 2
 
         with transaction.atomic():
             sid = transaction.savepoint()
             try:
-                cookies = {"bk_token": get_bk_token()}
                 roles = UserModels.user_set_roles(**{"user_obj": instance, "roles_ids": roles_ids})
                 roles_names = set(roles.values_list("role_name", flat=True))
 
@@ -154,16 +78,6 @@ class UserController(object):
                     app_module="系统管理",
                     obj_type="角色管理",
                 )
-                if operator:
-                    # 把此用户加入到权限中心到超级管理员里
-                    role_permission = RolePermissionUtil(username=instance.bk_username)
-                    if operator == 1:
-                        res = role_permission.add_main()
-                    else:
-                        res = role_permission.delete_main()
-                    if not res:
-                        raise Exception("权限中心设置超管角色失败！")
-
                 # 把此用户和角色加入policy
                 add_role, delete_role = RoleUtils.get_add_role_remove_role(roles=roles_names, old_roles=old_user_role)
                 CasbinUtils.set_user_role_policy(instance.bk_username, add_role, delete_role)
@@ -201,7 +115,6 @@ class UserController(object):
         """
         self = kwargs["self"]
         request = kwargs["request"]
-        manage_api = kwargs["manage_api"]
         current_ip = getattr(request, "current_ip", "127.0.0.1")
         with transaction.atomic():
             sid = transaction.savepoint()
@@ -368,7 +281,6 @@ class UserController(object):
         """
         self = kwargs["self"]
         request = kwargs["request"]
-        manage_api = kwargs["manage_api"]
         current_ip = getattr(request, "current_ip", "127.0.0.1")
         user_id, bk_user_id = UserUtils.username_manage_get_user_data(**{"request": request})
         admin_bool = UserModels.get_user_admin_bool(**{"id": user_id, "self": self, "field": "id"})
@@ -434,15 +346,6 @@ class UserController(object):
 
         user_obj = UserModels.get_user_objects(user_id=user_id)
         old_user_role = set(user_obj.roles.all().values_list("role_name", flat=True))
-        admin_group = SysRole.objects.get(role_name=DB_SUPER_USER)
-        user_obj_in_admin_group = user_obj.roles.filter(role_name=DB_SUPER_USER).first()  # 用户是否在超管组内
-        operator = 0  # 0 无修改 1 新增 2 删除
-        if admin_group.id in roles_ids:
-            if not user_obj_in_admin_group:
-                operator = 1
-        else:
-            if user_obj_in_admin_group:
-                operator = 2
 
         with transaction.atomic():
             sid = transaction.savepoint()
@@ -459,15 +362,6 @@ class UserController(object):
                     app_module="系统管理",
                     obj_type="角色管理",
                 )
-                if operator:
-                    # 把此用户加入到权限中心到超级管理员里
-                    role_permission = RolePermissionUtil(username=user_obj.bk_username)
-                    if operator == 1:
-                        res = role_permission.add_main()
-                    else:
-                        res = role_permission.delete_main()
-                    if not res:
-                        raise Exception("权限中心设置超管角色失败！")
 
                 # 把此用户和角色加入policy
                 add_role, delete_role = RoleUtils.get_add_role_remove_role(roles=roles_names, old_roles=old_user_role)
@@ -833,9 +727,6 @@ class RoleController(object):
                     app_module="系统管理",
                     obj_type="角色管理",
                 )
-
-                transaction.on_commit(lambda: sync_role_permissions(add_user_names, delete_user_names))
-
                 # 把此用户和角色加入policy
                 CasbinUtils.set_role_user_policy(
                     role_name=role_instance.role_name,

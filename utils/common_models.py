@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
-
+from django.contrib.postgres.forms import JSONField
 from django.db import models
 from django.forms import CharField, IntegerField, FloatField, DateTimeField, DateField, TimeField, Field, BooleanField
-from django_mysql.forms import JSONField
 
 
 class TimeInfo(models.Model):

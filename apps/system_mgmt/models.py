@@ -17,9 +17,9 @@ specific language governing permissions and limitations under the License.
 import copy
 from collections import Iterable
 
+from django.contrib.postgres.fields import JSONField
 from django.db import models
 from django.db.models import Q
-from django_mysql.models import JSONField
 
 from apps.system_mgmt.constants import DB_NOT_ACTIVATION_ROLE, DB_SUPER_USER
 from utils.common_models import MaintainerInfo, TimeInfo, VtypeMixin

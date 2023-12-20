@@ -11,25 +11,15 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 import os
-import traceback
 
-from django.conf import settings
-from django.conf.urls import include, url
 from django.contrib import admin
 from django.urls import path
-from rest_framework.routers import SimpleRouter
 from django.conf.urls import include, url
 from rest_framework.routers import SimpleRouter
 
 from apps.system_mgmt.views import (
-    InstancesPermissionsModelViewSet,
     MenuManageModelViewSet,
     OperationLogViewSet,
-    RoleManageViewSet,
-    SysSettingViewSet,
-    SysUserViewSet,
-    UserManageViewSet,
-    KeycloakUserViewSet,
 )
 
 urlpatterns = [
@@ -56,7 +46,6 @@ for key, app_list in apps.items():
     for i in dir_list:
         urlpatterns.append(url(r"^{}/".format(i), include(f"{key}.{i}.urls")))  # noqa
 
-from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 

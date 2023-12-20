@@ -17,7 +17,6 @@ from apps.system_mgmt.casbin_package.policy_constants import MESH_NAMESPACE
 from apps.system_mgmt.constants import DB_APPS, DB_SUPER_USER
 from apps.system_mgmt.models import SysApps
 from apps.system_mgmt.utils import BizUtils, UserUtils
-from apps.system_mgmt.utils_package.db_utils import RolePermissionUtil
 from apps.system_mgmt.common_utils.casbin_mesh_common import CasbinMeshApiServer
 from utils.app_log import celery_logger as logger
 
@@ -40,32 +39,6 @@ def update_biz(*args, **kwargs):
     # 只更新超管的业务数据
     count = SysApps.objects.filter(app_key=DB_APPS, sys_role__role_name=DB_SUPER_USER).update(app_ids=all_biz_ids)
     logger.info(f"pull update_biz task finish update count:{count}")
-
-
-@task
-def sync_role_permissions(add_user_names, delete_user_names):
-    """
-    操作用户加入/删除到权限中心的超级管理员里
-    """
-    if add_user_names:
-        for add_user_name in add_user_names:
-            try:
-                role_permission = RolePermissionUtil(username=add_user_name)
-                res = role_permission.add_main()
-                if not res:
-                    logger.warning("权限中心设置超管角色失败！, username={}".format(add_user_name))
-            except Exception as err:
-                logger.exception("权限中心设置超管角色失败！, username={}, error={}".format(add_user_name, err))
-
-    if delete_user_names:
-        for delete_user_name in delete_user_names:
-            try:
-                role_permission = RolePermissionUtil(username=delete_user_name)
-                res = role_permission.delete_main()
-                if not res:
-                    logger.warning("取消权限中心设置超管角色失败！, username={}".format(delete_user_name))
-            except Exception as err:
-                logger.exception("权限中心设置超管角色失败！, username={}, error={}".format(delete_user_name, err))
 
 
 @task

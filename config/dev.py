@@ -45,14 +45,12 @@ DEBUG = True
 # SQL: CREATE DATABASE `framework_py` DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci; # noqa: E501
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.mysql",
+        "ENGINE": "django.db.backends.postgresql",
         "NAME": APP_CODE,  # noqa
-        "USER": "root",
-        "PASSWORD": "root",
-        "HOST": os.environ.get('BKAPP_MYSQL_HOST', 'mysql-container'),
-        "PORT": "3306",
-        # 单元测试 DB 配置，建议不改动
-        "TEST": {"NAME": "test_db", "CHARSET": "utf8", "COLLATION": "utf8_general_ci"},
+        "USER": "postgres",
+        "PASSWORD": "postgres",
+        "HOST": os.environ.get('BKAPP_MYSQL_HOST', 'postgres-container'),
+        "PORT": "5432",
     },
 }
 

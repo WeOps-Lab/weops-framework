@@ -1,35 +1,38 @@
 version: '3'
 services:
-  mysql:
-    image: mysql:latest
-    container_name: mysql-container
+  postgres:
+    image: postgres:14.10
+    container_name: postgres-container
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: weops_saas
-#      MYSQL_USER: root
-#      MYSQL_PASSWORD: root
+      POSTGRES_DB: weops_saas
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
-      - "3306:3306"
+      - "0.0.0.0:5432:5432"
     volumes:
-      - /path/to/mysql/data:/var/lib/mysql
+      - /path/to/postgres/data:/var/lib/postgresql/data
 
   redis:
     image: redis:latest
     container_name: redis-container
     ports:
-      - "6379:6379"
+      - "0.0.0.0:6379:6379"
+    volumes:
+      - /path/to/redis/data:/data
 
   casbin-mesh:
     image: ghcr.io/casbin/casbin-mesh:latest
     container_name: casbin-mesh-container
-    environment:
-      # Casbin Mesh configuration environment variables
-      CASBIN_MESH_DATABASE: mysql
-      CASBIN_MESH_DATABASE_CONNECTION_STRING: "mysql:mysql:3306?dbname=weops_saas&username=root&password=root"
-      CASBIN_MESH_REDIS_HOST: redis
-      CASBIN_MESH_REDIS_PORT: 6379
+#    environment:
+#      # Casbin Mesh configuration environment variables
+#      CASBIN_MESH_DATABASE: mysql
+#      CASBIN_MESH_DATABASE_CONNECTION_STRING: "mysql:mysql:3306?dbname=weops_saas&username=root&password=root"
+#      CASBIN_MESH_REDIS_HOST: redis
+#      CASBIN_MESH_REDIS_PORT: 6379
     ports:
-      - "4002:4002"
+      - "0.0.0.0:4002:4002"
+    volumes:
+      - /path/to/casmesh/data:/casmesh/data
 
   keycloak:
     image: quay.io/keycloak/keycloak:22.0.5
@@ -38,7 +41,7 @@ services:
       - KEYCLOAK_ADMIN=admin
       - KEYCLOAK_ADMIN_PASSWORD=admin
     ports:
-      - "8080:8080"
+      - "0.0.0.0:8080:8080"
     command: start-dev
 
   weops-lite:
@@ -52,7 +55,7 @@ services:
     volumes:
       - .:/app
     depends_on:
-      - mysql
+      - postgres
       - redis
       - casbin-mesh
       - keycloak

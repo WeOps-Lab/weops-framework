@@ -14,14 +14,11 @@ import hashlib
 import json
 import os
 import random
-import re
-import string
-import time
+
 
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Q, QuerySet
-from django.db.transaction import atomic
 from django.http import JsonResponse
 from rest_framework.request import Request
 from django.views.decorators.csrf import csrf_exempt
@@ -36,7 +33,6 @@ from rest_framework.mixins import ListModelMixin, RetrieveModelMixin, UpdateMode
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
-from django.apps import apps
 from apps.system_mgmt import constants as system_constants
 from apps.system_mgmt.utils_package.KeycloakTokenAuthentication import KeycloakTokenAuthentication
 from apps.system_mgmt.utils_package.KeycloakIsAutenticated import KeycloakIsAuthenticated
@@ -58,7 +54,6 @@ from apps.system_mgmt.serializers import (
     MenuManageModelSerializer,
     OperationLogSer,
     SysRoleSerializer,
-    SysSettingSer,
     SysUserSerializer,
 )
 from apps.system_mgmt.user_manages import UserManageApi
@@ -66,7 +61,6 @@ from apps.system_mgmt.utils import UserUtils
 from apps.system_mgmt.utils_package.controller import RoleController, UserController, KeycloakUserController, \
     KeycloakRoleController, KeycloakPermissionController
 from apps.system_mgmt.utils_package.inst_permissions import InstPermissionsUtils
-from blueapps.account.components.weixin.weixin_utils import WechatUtils
 from blueapps.account.decorators import login_exempt
 
 from blueking.component.shortcuts import get_client_by_user
@@ -77,7 +71,6 @@ from packages.drf.viewsets import ModelViewSet
 from utils.app_log import logger
 
 from utils.decorators import ApiLog, delete_cache_key_decorator
-from utils.usermgmt_sql_utils import UsermgmtSQLUtils
 from apps.system_mgmt.utils_package.CheckKeycloakPermission import check_keycloak_permission
 
 
@@ -105,64 +98,6 @@ def reset_policy_init(request):
     res = RoleController.open_set_casbin_mesh()
 
     return JsonResponse({"result": res, "message": "初始化成功" if res else "初始化失败！错误信息请查询日志！"})
-
-
-@login_exempt
-@csrf_exempt
-@require_POST
-def open_create_user(request, *args, **kwargs):
-    """
-    对外开放接口
-    创建用户
-    data = {
-            "username": "hhhopen_user",
-            "display_name": "测试开放接口",
-            "email": "111@qq.com",
-            "telephone": "13237897621"
-            }
-    """
-    try:
-        data = json.loads(request.body)
-    except Exception as err:
-        logger.exception("对外开放接口[open_create_user]参数错误，无法序列化！error={}".format(err))
-        res = {"result": False, "data": {}, "message": "参数错误！"}
-        return JsonResponse(data=res)
-
-    try:
-        manage_api = UserManageApi()
-        res = UserController.open_create_user(data, manage_api, SysUserSerializer)
-    except Exception as e:
-        logger.exception("对外开放接口[open_create_user]执行错误！error={}".format(e))
-        res = {"result": False, "data": {}, "message": "创建用户失败! 请联系管理员！"}
-
-    return JsonResponse(data=res)
-
-
-@login_exempt
-@csrf_exempt
-@require_POST
-def open_set_user_roles(request, *args, **kwargs):
-    """
-    对外开放接口
-    设置用户角色
-    data = {
-            "user_id":77,
-            "roles":[16]
-            }
-    """
-    try:
-        data = json.loads(request.body)
-    except Exception as err:
-        logger.exception("对外开放接口[open_set_user_roles]参数错误，无法序列化！error={}".format(err))
-        res = {"result": False, "data": {}, "message": "参数错误！"}
-        return JsonResponse(data=res)
-    try:
-        res = UserController.open_set_user_roles(data)
-    except Exception as e:
-        logger.exception("对外开放接口[open_set_user_roles]执行错误！error={}".format(e))
-        res = {"result": False, "data": {}, "message": "设置用户角色失败！请联系管理员"}
-
-    return JsonResponse(data=res)
 
 
 class LogoViewSet(RetrieveModelMixin, UpdateModelMixin, GenericViewSet):
@@ -276,104 +211,6 @@ class OperationLogViewSet(ListModelMixin, GenericViewSet):
     ordering_fields = ["created_at"]
     ordering = ["-created_at"]
     filter_class = OperationLogFilter
-
-
-class SysSettingViewSet(ModelViewSet):
-    permission_classes = [IsAuthenticated, ManagerPermission]
-    queryset = SysSetting.objects.all()
-    serializer_class = SysSettingSer
-    ordering_fields = ["created_at"]
-    ordering = ["-created_at"]
-    lookup_field = "key"
-
-    @action(methods=["GET"], detail=False)
-    @ApiLog("获取登录配置")
-    def get_login_set(self, request):
-        sys_set_list = SysSetting.objects.filter(
-            key__in=["two_factor_enable", "auth_type", "auth_white_list", "default_domain"]
-        )
-        if not sys_set_list:
-            user = SysUser.objects.get(bk_username="admin")
-            return JsonResponse(
-                {
-                    "result": True,
-                    "data": {
-                        "auth_type": ["mail"],
-                        "two_factor_enable": False,
-                        "auth_white_list": {
-                            "user": [{"bk_username": "admin", "chname": user.chname, "id": user.id}],
-                            "role": [],
-                        },
-                    },
-                }
-            )
-        return_data = {i.key: i.real_value for i in sys_set_list}
-        if "default_domain" not in return_data:
-            return_data["default_domain"] = ""
-        return JsonResponse({"result": True, "data": return_data})
-
-    @action(methods=["GET"], detail=False)
-    @ApiLog("获取所有的域")
-    def get_domain(self, request):
-        client = UsermgmtSQLUtils()
-        return_data = client.get_domain()
-        client.disconnect()
-        return JsonResponse({"result": True, "data": return_data})
-
-    @action(methods=["POST"], detail=False)
-    @ApiLog("设置默认域")
-    def set_domain(self, request):
-        SysSetting.objects.update_or_create(
-            key="default_domain",
-            defaults={"value": request.data.get("default_domain", "")},
-        )
-        return JsonResponse({"result": True})
-
-    @action(methods=["POST"], detail=False)
-    @ApiLog("修改双因子配置")
-    def update_login_set(self, request):
-        params = request.data
-        set_list = []
-        for key, value in params.items():
-            if key not in ["two_factor_enable", "auth_type", "auth_white_list"]:
-                continue
-            set_list.append(SysSetting(key=key, value=json.dumps(value), vtype="json"))
-        with atomic():
-            SysSetting.objects.filter(key__in=["two_factor_enable", "auth_type", "auth_white_list"]).delete()
-            SysSetting.objects.bulk_create(set_list)
-            OperationLog.objects.create(
-                operator=request.user.get('username', None),
-                operate_type=OperationLog.MODIFY,
-                operate_obj="多因子认证",
-                operate_summary=f"用户{request.user.get('username', None)}修改了多因子认证信息",
-                current_ip=getattr(request, "current_ip", "127.0.0.1"),
-                app_module="系统配置",
-                obj_type="多因子认证",
-            )
-        return JsonResponse({"result": True})
-
-    @action(methods=["POST"], detail=False)
-    @ApiLog("发送验证码")
-    def send_validate_code(self, request):
-        user = request.user.get('username', None)
-        result = _send_validate_code(user)
-        return JsonResponse(result)
-
-    @action(methods=["POST"], detail=False, url_path="wx_app_id")
-    @ApiLog("获取微信/企业微信APP_ID")
-    def get_weixin_app_id(self, request):
-        path_url = request.data.get("path_url")
-        wx_app_id = settings.WX_APP_ID
-        timestamp = str(time.time())
-        noncestr = "".join(random.sample(string.ascii_letters + string.digits, 16))
-        params = {
-            "jsapi_ticket": WechatUtils.jsapi_ticket(),
-            "noncestr": noncestr,
-            "timestamp": timestamp,
-            "url": path_url,
-        }
-        signature = WechatUtils.generate_signature(params)
-        return Response(data={"appId": wx_app_id, "timestamp": timestamp, "nonceStr": noncestr, "signature": signature})
 
 
 from rest_framework import viewsets

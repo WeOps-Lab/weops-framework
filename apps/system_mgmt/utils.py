@@ -20,7 +20,6 @@ from apps.system_mgmt.constants import (
 )
 from apps.system_mgmt.models import MenuManage, OperationLog, SysApps, SysRole, SysUser
 from apps.system_mgmt.utils_package.casbin_utils import CasBinInstUtils, CasbinUtils
-from apps.system_mgmt.utils_package.db_utils import RolePermissionUtil
 from blueking.component.shortcuts import get_client_by_user
 from apps.system_mgmt.common_utils.bk_api_utils.cc import BkApiCCUtils
 from apps.system_mgmt.common_utils.bk_api_utils.usermanager import BKUserApiCCUtils
@@ -119,17 +118,6 @@ class UserUtils(object):
                     SysApps.objects.create(**apps_dict)
 
         logger.info("初始化角色完成")
-
-    @staticmethod
-    def init_bk_iam_role(**kwargs):
-        # 把超管组的用户 加入到权限中心
-        role_users = SysUser.objects.filter(roles__role_name=DB_SUPER_USER).values_list("bk_username", flat=True)
-        for bk_username in role_users:
-            try:
-                role_permission = RolePermissionUtil(username=bk_username)
-                role_permission.add_main()
-            except Exception as err:
-                logger.error("部署时初始化用户到权限中心超管角色失败: bk_username={}, error={}".format(bk_username, err))
 
     @staticmethod
     @catch_exception
@@ -268,7 +256,6 @@ def post_migrate_init(**kwargs):
     init_menu()  # 初始化菜单
     UserUtils.init_sys_role()  # 初始化超管和普通用户
     UserUtils.pull_sys_user()  # 同步用户
-    UserUtils.init_bk_iam_role()  # 把超管组的用户 加入到权限中心
     CasbinUtils.init_operate_ids()  # v3.9 初始化页面权限到操作权限
     CasbinUtils.menu_operator()  # 页面变化操作
 
@@ -451,6 +438,7 @@ class InstPermissionsInitData(object):
                 logger.info("同步旧数据到casbin mesh. result={}".format(result))
         except Exception as err:
             logger.warning("初始化实例权限数据到casbin失败！error={}".format(err))
+
 
 def init_keycloak(**kwargs):
     """
