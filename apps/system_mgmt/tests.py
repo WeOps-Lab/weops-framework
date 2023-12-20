@@ -18,28 +18,26 @@ import uuid
 import json
 
 class PythonKeycloakTest(unittest.TestCase):
-    # def setUp(self):
-    #     self.username = 'admin'
-    #     self.password = 'admin'
-    #     self.id_of_client = 'a72a5bed-8673-48e1-ac0a-97ba3c06c88f'
-    #     self.keycloak_openid = KeycloakOpenID(
-    #         server_url=f'http://localhost:8080/',
-    #         client_id=f'weops_lite',
-    #         realm_name=f'master',
-    #         client_secret_key=f'UQym8RIjp4X4hxMxIkL1hOktVU1auDa3')
-    #     self.token = self.keycloak_openid.token(self.username, self.password)
-    #
-    #     self.keycloak_connection = KeycloakOpenIDConnection(
-    #         server_url=f'http://localhost:8080/',
-    #         realm_name=f'master',
-    #         client_id=f'weops_lite',
-    #         client_secret_key=f'UQym8RIjp4X4hxMxIkL1hOktVU1auDa3',
-    #         custom_headers={
-    #             "Authorization": f"Bearer {self.token['access_token']}"
-    #         },
-    #         verify=True)
-    #     self.keycloak_admin = KeycloakAdmin(connection=self.keycloak_connection)
-    #     print("Setting up the test environment")
+    def setUp(self):
+        self.username = 'admin'
+        self.password = 'admin'
+        self.id_of_client = 'a72a5bed-8673-48e1-ac0a-97ba3c06c88f'
+        self.keycloak_openid = KeycloakOpenID(
+            server_url=f'http://localhost:8081/',
+            client_id=f'weops_lite',
+            realm_name=f'weops',
+            client_secret_key=f'**********')
+        self.token = self.keycloak_openid.token(self.username, self.password)
+
+        self.keycloak_connection = KeycloakOpenIDConnection(
+            server_url=f'http://localhost:8081/',
+            username=self.username,
+            password=self.password,
+            user_realm_name='master',
+            realm_name=f'weops',
+            client_id=f'admin-cli')
+        self.keycloak_admin = KeycloakAdmin(connection=self.keycloak_connection)
+        print("Setting up the test environment")
 
     def test_method(self):
         userinfo = self.keycloak_openid.userinfo(self.token['access_token'])
@@ -120,6 +118,32 @@ class PythonKeycloakTest(unittest.TestCase):
         obj = SimpleNamespace(name='ddd')
         print(obj.name)
         realms = self.keycloak_admin.get_realms()
+        pass
+
+    def test_groups(self):
+        g_query = {
+            'search':'555',
+            'first':0,
+            'max':20
+        }
+        groups = self.keycloak_admin.get_groups(g_query)
+        m_query = {
+            'first':0,
+            'max':20
+        }
+        group = self.keycloak_admin.get_group(groups[0]['id'])
+        roles = self.keycloak_admin.get_group_client_roles(groups[0]['id'], self.id_of_client)
+        members = self.keycloak_admin.get_group_members(groups[0]['id'],m_query)
+        # self.keycloak_admin.assign_group_client_roles('fc1c70a8-b159-47e0-97e1-1396433438fc',
+        #                                               'a72a5bed-8673-48e1-ac0a-97ba3c06c88f',
+        #                                               [{
+        #                                                   'name': 'normal',
+        #                                                   'id':'8d1600a5-a785-4d18-a815-44049210968b'
+        #                                               }])
+        # group_payload = {
+        #     'name':'hhg'
+        # }
+        # self.keycloak_admin.create_group()
         pass
 
 if __name__ == '__main__':

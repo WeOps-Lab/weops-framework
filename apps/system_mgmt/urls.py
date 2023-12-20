@@ -35,5 +35,6 @@ router = DefaultRouter()
 router.register(r'users', views.KeycloakUserViewSet, basename='user')
 router.register(r'roles', views.KeycloakRoleViewSet, basename='role')
 router.register(r'permissions', views.KeycloakPermissionViewSet, basename='permission')
+router.register(r'groups', views.KeycloakGroupViewSet, basename='group')
 # 用户管理API
 urlpatterns.extend(router.urls)
