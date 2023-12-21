@@ -917,6 +917,12 @@ class KeycloakUserController(object):
         users = cls.keycloak_utils().get_keycloak_admin().get_users(params)
         id_of_client = cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT']
         for user in users:
+            user['groups']= cls.keycloak_utils().get_keycloak_admin().get_user_groups(user['id'])
+            user['group_roles'] = list()
+            for group in user['groups']:
+                roles = cls.keycloak_utils().get_keycloak_admin().get_group_client_roles(group['id']
+                                        , cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
+                user['group_roles'].extend(roles)
             user['roles'] = cls.keycloak_utils().get_keycloak_admin().get_client_roles_of_user(user['id'], id_of_client)
         return {"count": len(users), "users": users}
 
@@ -1272,11 +1278,12 @@ class KeycloakGroupController:
         cls.keycloak_utils().get_keycloak_admin().update_group(group_id, payload)
 
     @classmethod
-    def delete_group(cls, group_id):
+    def delete_group(cls, group_ids: list):
         """
         删除组
         """
-        cls.keycloak_utils().get_keycloak_admin().delete_group(group_id)
+        for group_id in group_ids:
+            cls.keycloak_utils().get_keycloak_admin().delete_group(group_id)
 
     @classmethod
     def assign_group_user(cls,group_id, user_ids: list):
@@ -1286,12 +1293,29 @@ class KeycloakGroupController:
         for user_id in user_ids:
             cls.keycloak_utils().get_keycloak_admin().group_user_add(user_id, group_id)
 
+
     @classmethod
     def unassigned_group_user(cls, group_id, user_ids: list):
         """
         取消关联组和用户
         """
         for user_id in user_ids:
+            cls.keycloak_utils().get_keycloak_admin().group_user_remove(user_id, group_id)
+
+    @classmethod
+    def assign_user_group(cls, user_id, group_ids: list):
+        """
+        关联组和用户
+        """
+        for group_id in group_ids:
+            cls.keycloak_utils().get_keycloak_admin().group_user_add(user_id, group_id)
+
+    @classmethod
+    def unassigned_user_group(cls, user_id, group_ids: list):
+        """
+        取消关联组和用户
+        """
+        for group_id in group_ids:
             cls.keycloak_utils().get_keycloak_admin().group_user_remove(user_id, group_id)
 
     @classmethod

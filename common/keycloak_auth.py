@@ -2,20 +2,22 @@ from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 from django.contrib.auth.models import User
 from django.core.handlers.wsgi import WSGIRequest
-from keycloak import KeycloakOpenID
 from django.conf import LazySettings
-from django.contrib.auth import get_user_model
-
-from apps.system_mgmt.models import SysUser
 from apps.system_mgmt.utils_package.keycloak_utils import KeycloakUtils
-from apps.system_mgmt.utils_package.controller import KeycloakUserController
-from keycloak import KeycloakAdmin
-from keycloak import KeycloakOpenIDConnection
+from rest_framework.permissions import BasePermission
+from rest_framework.exceptions import PermissionDenied
 
 settings = LazySettings()
 
+"""
+存放Keycloak身份验证和权限验证的组件
+"""
+
 
 class KeycloakTokenAuthentication(BaseAuthentication):
+    """
+    认证Keycloak token
+    """
 
     def __init__(self):
         self.__keycloak_util = KeycloakUtils()
@@ -41,6 +43,20 @@ class KeycloakTokenAuthentication(BaseAuthentication):
         user['resource_access'] = tokeninfo['resource_access']
         user_obj = User(user['username'], True, user)
         return user_obj, token
+
+
+class KeycloakIsAuthenticated(BasePermission):
+    """
+    权限验证，认证了就可以通过
+    """
+    message = 'Authentication failed.'
+
+    def has_permission(self, request, view):
+        # 如果认证失败，抛出 PermissionDenied 异常
+        if request.user is None:
+            raise PermissionDenied(self.message)
+        # 认证成功
+        return True
 
 
 class User:

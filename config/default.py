@@ -274,7 +274,7 @@ REST_FRAMEWORK = {
     # "EXCEPTION_HANDLER": "utils.exception_capture.common_exception_handler",
 }
 if LOGIN_METHOD == 'keycloak':
-    REST_FRAMEWORK['DEFAULT_AUTHENTICATION_CLASSES'] = ('apps.system_mgmt.utils_package.KeycloakTokenAuthentication'
+    REST_FRAMEWORK['DEFAULT_AUTHENTICATION_CLASSES'] = ('common.keycloak_auth'
                                                         '.KeycloakTokenAuthentication',)
 
 HAYSTACK_CONNECTIONS = {

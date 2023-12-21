@@ -38,8 +38,8 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from django.apps import apps
 from apps.system_mgmt import constants as system_constants
-from apps.system_mgmt.utils_package.KeycloakTokenAuthentication import KeycloakTokenAuthentication
-from apps.system_mgmt.utils_package.KeycloakIsAutenticated import KeycloakIsAuthenticated
+from common.keycloak_auth import KeycloakTokenAuthentication
+from common.keycloak_auth import KeycloakIsAuthenticated
 from apps.system_mgmt.casbin_package.permissions import ManagerPermission, get_user_roles
 from apps.system_mgmt.constants import DB_APPS, DB_MENU_IDS, MENUS_MAPPING
 from apps.system_mgmt.filters import (
@@ -547,6 +547,42 @@ class KeycloakUserViewSet(viewsets.ViewSet):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'id': pk}, status=status.HTTP_200_OK)
 
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_ARRAY,
+            items=openapi.Schema(type=openapi.TYPE_STRING)
+        ),
+        operation_description='将一系列组添加到用户'
+    )
+    @action(detail=True, methods=['patch'], url_path='assign_groups')
+    def assign_user_groups(self, request: Request, pk: str):
+        try:
+            ids = request.data
+            if ids is None or not isinstance(ids, list) or len(ids) == 0:
+                return Response({"error": "check your request data"}, status=status.HTTP_400_BAD_REQUEST)
+            KeycloakGroupController.assign_user_group(pk, ids)
+            return Response({'id': pk}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_ARRAY,
+            items=openapi.Schema(type=openapi.TYPE_STRING)
+        ),
+        operation_description='将一系列组从该用户移除'
+    )
+    @action(detail=True, methods=['delete'], url_path='unassign_groups')
+    def unassign_user_groups(self, request: Request, pk: str):
+        try:
+            ids = request.data
+            if ids is None or not isinstance(ids, list) or len(ids) == 0:
+                return Response({"error": "check your request data"}, status=status.HTTP_400_BAD_REQUEST)
+            KeycloakGroupController.unassigned_user_group(pk, ids)
+            return Response({'id': pk}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class KeycloakRoleViewSet(viewsets.ViewSet):
     authentication_classes = [KeycloakTokenAuthentication]
@@ -773,14 +809,23 @@ class KeycloakGroupViewSet(viewsets.ViewSet):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    @swagger_auto_schema()
-    def destroy(self, request: Request, pk: str):
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_ARRAY,
+            items=openapi.Schema(type=openapi.TYPE_STRING)
+        )
+    )
+    @action(detail=False, methods=['delete'])
+    def delete_groups(self, request: Request):
         """
         删除组
         """
         try:
-            KeycloakGroupController.delete_group(pk)
-            return Response({'id': pk}, status=status.HTTP_200_OK)
+            ids = request.data
+            if ids is None or not isinstance(ids, list) or len(ids) == 0:
+                return Response({"error": "check your request data"}, status=status.HTTP_400_BAD_REQUEST)
+            KeycloakGroupController.delete_group(ids)
+            return Response({'id': ""}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

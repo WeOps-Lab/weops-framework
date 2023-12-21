@@ -2,7 +2,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
-
+from common.keycloak_auth import KeycloakIsAuthenticated, KeycloakTokenAuthentication
 from apps.syslog.constants import APP_MODULE_NAME, MONITOR
 from apps.syslog.permission import MonitorPolicyLogInstPermission
 from apps.syslog.services.log import SyslogService
@@ -16,26 +16,27 @@ from utils.decorators import ApiLog
 
 
 class SyslogViewSet(ViewSet):
-    permission_classes = [IsAuthenticated, ManagerPermission]
+    authentication_classes = [KeycloakTokenAuthentication]
+    permission_classes = [KeycloakIsAuthenticated]
 
-    @property
-    def permissions_actions(self):
-        """权限校验action"""
-        return [
-            "delete_event_definitions",
-            "update_event_definitions",
-            "schedule_event_definitions",
-            "unschedule_event_definitions",
-            "batch_schedule_event_definitions",
-            "batch_unschedule_event_definitions",
-        ]
-
-    def get_permissions(self):
-        if self.action in self.permissions_actions:
-            _permission_classes = [permission() for permission in self.permission_classes]
-            _permission_classes += [MonitorPolicyLogInstPermission()]
-            return _permission_classes
-        return super().get_permissions()
+    # @property
+    # def permissions_actions(self):
+    #     """权限校验action"""
+    #     return [
+    #         "delete_event_definitions",
+    #         "update_event_definitions",
+    #         "schedule_event_definitions",
+    #         "unschedule_event_definitions",
+    #         "batch_schedule_event_definitions",
+    #         "batch_unschedule_event_definitions",
+    #     ]
+    #
+    # def get_permissions(self):
+    #     if self.action in self.permissions_actions:
+    #         _permission_classes = [permission() for permission in self.permission_classes]
+    #         _permission_classes += [MonitorPolicyLogInstPermission()]
+    #         return _permission_classes
+    #     return super().get_permissions()
 
     @action(methods=["POST"], detail=False, url_path="views/search")
     @ApiLog("查询日志")
