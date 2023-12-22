@@ -41,7 +41,6 @@ INSTALLED_APPS += (  # noqa
     "rest_framework",
     "rest_framework_swagger",
     "base_index",
-    "casbin_adapter.apps.CasbinAdapterConfig",
 )
 
 # 这里是默认的中间件，大部分情况下，不需要改动
@@ -83,18 +82,19 @@ REDIS_HOST = os.environ.get("BKAPP_REDIS_HOST", "redis-container")
 REDIS_PORT = os.environ.get("BKAPP_REDIS_PORT", "6379")
 REDIS_DB = os.environ.get("BKAPP_REDIS_DB", 0)
 AUTO_MATE_REDIS_DB = os.environ.get("BKAPP_AUTO_MATE_REDIS_DB", 11)
+
 # 去环境变量寻找登录方式，找不到就用keycloak
 LOGIN_METHOD = os.environ.get("BKAPP_LOGIN_METHOD", "keycloak")
 LOGIN_REDIRECT_URL = '/admin/' if LOGIN_METHOD == "local" else '/keycloak_login/'
 KEYCLOAK_SETTINGS = {
     "HOST": os.environ.get("BKAPP_KEYCLOAK_SERVER_URL", "keycloak-container"),
     "PORT": os.environ.get("BKAPP_KEYCLOAK_SERVER_URL", "8080"),
-    "REALM_NAME" : os.environ.get("BKAPP_REALM_NAME", "weops"),
-    "CLIENT_ID" : os.environ.get("BKAPP_CLIENT_ID", "weops_lite"),
-    "ID_OF_CLIENT" :  os.environ.get("BKAPP_ID_OF_CLIENT", ""),
-    "CLIENT_SECRET_KEY" : os.environ.get("BKAPP_CLIENT_SECRET_KEY", ""),
-    "ADMIN_USERNAME" : os.environ.get("BKAPP_ADMIN_USERNAME", "admin"),
-    "ADMIN_PASSWORD" : os.environ.get("BKAPP_ADMIN_USERNAME", "admin")
+    "REALM_NAME": os.environ.get("BKAPP_REALM_NAME", "weops"),
+    "CLIENT_ID": os.environ.get("BKAPP_CLIENT_ID", "weops_lite"),
+    "ID_OF_CLIENT":  os.environ.get("BKAPP_ID_OF_CLIENT", ""),
+    "CLIENT_SECRET_KEY": os.environ.get("BKAPP_CLIENT_SECRET_KEY", ""),
+    "ADMIN_USERNAME": os.environ.get("BKAPP_ADMIN_USERNAME", "admin"),
+    "ADMIN_PASSWORD": os.environ.get("BKAPP_ADMIN_USERNAME", "admin")
 }
 # syslog依赖的配置
 FILE_PATH = os.environ.get("BKAPP_FILE_UPLOAD_PATH", "/data/bkce/public/paas_agent/share/weops_saas/")
@@ -184,19 +184,6 @@ LANGUAGES = (
     ("zh-hans", "简体中文"),
 )
 
-# 控制台绑定微信的类型(wx微信,qywx企业微信)
-CONSOLE_BIND_WX_TYPE = os.getenv("BKAPP_CONSOLE_BIND_WX_TYPE", "wx")
-
-# 微信公众号配置
-WX_APP_ID = os.getenv("BKAPP_WEIXIN_APP_ID", "")
-WX_APP_SECRET = os.getenv("BKAPP_WEIXIN_APP_SECRET", "")
-WECHAT_SETTING = {"appid": WX_APP_ID, "appsecret": WX_APP_SECRET}
-WX_ENVENT_NAME = os.getenv("BKAPP_WX_ENVENT_NAME", "weops事件管理")
-
-# cmdb 路径配置
-CMDB_URL = os.getenv("BKAPP_CMDB_HREF", "http://cmdb.weops.com/").strip("/") + "/"
-# 作业平台 路径配置
-JOB_URL = os.getenv("BKAPP_JOB_HREF", "http://job.weops.com/").strip("/") + "/"
 # weops app code
 WEOPS_CODE = os.getenv("BKAPP_WEOPS_CODE", "weops_saas")
 # 当前环境（t/o）
@@ -204,11 +191,6 @@ CURRENT_ENV = "o" if os.getenv("BK_ENV") == "production" else "t"
 
 # 线程池线程个数
 THREAD_POOL_MAX_WORKERS = os.getenv("BKAPP_THREAD_POOL_MAX_WORKERS", "8")
-
-# WeOps目录地址，用来存放远程管理上传的文件
-UPLOAD_FILES_PATH = os.getenv("BKAPP_FILE_UPLOAD_PATH", "/data/bkce/public/paas_agent/share/weops_saas/")
-SOURCE_IP = os.getenv("BKAPP_SOURCE_IP", "10.10.25.169")
-BK_CLOUD_ID = os.getenv("BKAPP_BK_CLOUD_ID", "0")
 
 CURRENT_FILE_PATH = "USERRES"  # 存放文件路径
 
@@ -276,16 +258,3 @@ REST_FRAMEWORK = {
 if LOGIN_METHOD == 'keycloak':
     REST_FRAMEWORK['DEFAULT_AUTHENTICATION_CLASSES'] = ('apps.system_mgmt.utils_package.KeycloakTokenAuthentication'
                                                         '.KeycloakTokenAuthentication',)
-
-HAYSTACK_CONNECTIONS = {
-    "default": {
-        # 使用whoosh引擎
-        "ENGINE": "haystack.backends.whoosh_backend.WhooshEngine",
-        # 索引文件路径
-        "PATH": os.path.join(BASE_DIR, "USERRES", "whoosh_index"),  # noqa
-    }
-}
-PROFILE_BUCKET = "weops-profile-private"  # 配置文件桶
-MINIO_PRIVATE_BUCKETS = [
-    PROFILE_BUCKET,
-]

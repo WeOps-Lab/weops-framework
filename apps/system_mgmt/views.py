@@ -11,17 +11,15 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 import hashlib
-import json
 import os
 import random
 
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q, QuerySet
+from django.db.models import Q
 from django.http import JsonResponse
 from rest_framework.request import Request
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -36,39 +34,26 @@ from rest_framework.viewsets import GenericViewSet
 from apps.system_mgmt import constants as system_constants
 from apps.system_mgmt.utils_package.KeycloakTokenAuthentication import KeycloakTokenAuthentication
 from apps.system_mgmt.utils_package.KeycloakIsAutenticated import KeycloakIsAuthenticated
-from apps.system_mgmt.casbin_package.permissions import ManagerPermission, get_user_roles
-from apps.system_mgmt.constants import DB_APPS, DB_MENU_IDS, MENUS_MAPPING
 from apps.system_mgmt.filters import (
-    InstancesPermissionsFilter,
     MenuManageFilter,
     NewSysUserFilter,
     OperationLogFilter,
-    SysRoleFilter,
-    SysUserFilter,
 )
-from apps.system_mgmt.models import InstancesPermissions, MenuManage, OperationLog, SysRole, SysSetting, SysUser
+from apps.system_mgmt.models import MenuManage, OperationLog, SysSetting, SysUser
 from apps.system_mgmt.pages import LargePageNumberPagination
 from apps.system_mgmt.serializers import (
-    InstancesPermissionsModelSerializer,
     LogSerializer,
     MenuManageModelSerializer,
     OperationLogSer,
-    SysRoleSerializer,
     SysUserSerializer,
 )
 from apps.system_mgmt.user_manages import UserManageApi
-from apps.system_mgmt.utils import UserUtils
-from apps.system_mgmt.utils_package.controller import RoleController, UserController, KeycloakUserController, \
+from apps.system_mgmt.utils_package.controller import UserController, KeycloakUserController, \
     KeycloakRoleController, KeycloakPermissionController
-from apps.system_mgmt.utils_package.inst_permissions import InstPermissionsUtils
 from blueapps.account.decorators import login_exempt
 
-from blueking.component.shortcuts import get_client_by_user
-from apps.system_mgmt.common_utils.bk_api_utils.main import ApiManager
-from apps.system_mgmt.common_utils.casbin_inst_service import CasBinInstService
 from apps.system_mgmt.constants import USER_CACHE_KEY
 from packages.drf.viewsets import ModelViewSet
-from utils.app_log import logger
 
 from utils.decorators import ApiLog, delete_cache_key_decorator
 from apps.system_mgmt.utils_package.CheckKeycloakPermission import check_keycloak_permission
@@ -86,20 +71,6 @@ def test_get(request):
     return JsonResponse({"result": True, "data": {}})
 
 
-@login_exempt
-@csrf_exempt
-def reset_policy_init(request):
-    """
-    手动初始化新的policy到数据库
-    """
-    if request.method != "POST":
-        return JsonResponse({"result": False, "message": "请求方式不允许！"})
-
-    res = RoleController.open_set_casbin_mesh()
-
-    return JsonResponse({"result": res, "message": "初始化成功" if res else "初始化失败！错误信息请查询日志！"})
-
-
 class LogoViewSet(RetrieveModelMixin, UpdateModelMixin, GenericViewSet):
     authentication_classes = [KeycloakTokenAuthentication]
     permission_classes = [KeycloakIsAuthenticated]
@@ -112,11 +83,6 @@ class LogoViewSet(RetrieveModelMixin, UpdateModelMixin, GenericViewSet):
             defaults=system_constants.SYSTEM_LOGO_INFO,
         )
         return obj
-
-    # def get_permissions(self):
-    #     if self.action == "retrieve":
-    #         self.permission_classes = [IsAuthenticated]
-    #     return super().get_permissions()
 
     @check_keycloak_permission('SysSetting_logo_change')
     def update(self, request, *args, **kwargs):
@@ -156,51 +122,6 @@ class LogoViewSet(RetrieveModelMixin, UpdateModelMixin, GenericViewSet):
             obj_type="系统设置",
         )
         return Response(serializer.data)
-
-
-class SysUserViewSet(ModelViewSet):
-    permission_classes = [IsAuthenticated, ManagerPermission]
-    queryset = SysUser.objects.all()
-    serializer_class = SysUserSerializer
-    ordering_fields = ["created_at"]
-    ordering = ["-created_at"]
-    filter_class = SysUserFilter
-    pagination_class = LargePageNumberPagination
-
-    def list(self, request, *args, **kwargs):
-        page_size = request.GET["page_size"]
-        if page_size == "-1":
-            # 返回全部的数据
-            return Response({"items": self.queryset.values("chname", "bk_username", "bk_user_id")})
-
-        return super().list(request, *args, **kwargs)
-
-    def get_permissions(self):
-        if self.action == "pull_bk_user":
-            self.permission_classes = [IsAuthenticated]
-        return super().get_permissions()
-
-    @delete_cache_key_decorator(USER_CACHE_KEY)
-    @action(methods=["POST"], detail=False, url_path="pull_bk_user")
-    def pull_bk_user(self, request, *args, **kwargs):
-        UserUtils.pull_sys_user()
-        current_ip = getattr(request, "current_ip", "127.0.0.1")
-        OperationLog.objects.create(
-            operator=request.user.get('username', None),
-            operate_type=OperationLog.ADD,
-            operate_obj=SysUser._meta.verbose_name,
-            operate_summary="手动拉取蓝鲸用户",
-            current_ip=current_ip,
-            app_module="系统管理",
-            obj_type="用户",
-        )
-
-        return Response({})
-
-    # @action(methods=["GET"], detail=False, url_path="bizs")
-    # def get_bizs(self, request, *args, **kwargs):
-    #     res = get_user_biz_list(request)
-    #     return Response(res)
 
 
 class OperationLogViewSet(ListModelMixin, GenericViewSet):
@@ -514,8 +435,6 @@ class KeycloakRoleViewSet(viewsets.ViewSet):
         return Response({'id': pk}, status=status.HTTP_200_OK)
 
 
-
-
 class KeycloakPermissionViewSet(viewsets.ViewSet):
     authentication_classes = [KeycloakTokenAuthentication]
     permission_classes = [KeycloakIsAuthenticated]
@@ -592,6 +511,7 @@ class UserManageViewSet(ModelViewSet):
             required=['username', 'display_name', 'password']
         ),
     )
+
     @delete_cache_key_decorator(USER_CACHE_KEY)
     @action(methods=["POST"], detail=False, url_path="create_user")
     @ApiLog("用户管理创建用户")
@@ -696,216 +616,6 @@ class UserManageViewSet(ModelViewSet):
             **{"request": request, "self": self, "manage_api": self.manage_api, "id": pk}
         )
         return Response(**res)
-
-
-class RoleManageViewSet(ModelViewSet):
-    permission_classes = [IsAuthenticated]
-    queryset = SysRole.objects.prefetch_related("sysuser_set")
-    serializer_class = SysRoleSerializer
-    ordering_fields = ["-built_in", "created_at"]
-    ordering = ["-built_in", "-created_at"]
-    filter_class = SysRoleFilter
-    pagination_class = LargePageNumberPagination
-
-    @action(methods=["GET"], detail=False, url_path="get_roles")
-    @ApiLog("角色管理获取角色")
-    def bk_role_manage_list(self, request, *args, **kwargs):
-        """
-        获取角色 分页
-        """
-        return super().list(request, *args, **kwargs)
-
-    @action(methods=["GET"], detail=False)
-    @ApiLog("多因子角色查询")
-    def search_role_list(self, request, *args, **kwargs):
-        """
-        获取角色 分页
-        """
-        page = int(request.GET.get("page", 1))
-        page_size = int(request.GET.get("page_size", 10))
-        search = request.GET.get("search", "")
-        start = page_size * (page - 1)
-        end = page_size * page
-        role_list = SysRole.objects.filter(role_name__icontains=search)
-        role_count = role_list.count()
-        return_data = list(role_list.values("id", "role_name")[start:end])
-        user_list = SysUser.objects.filter(roles__in=[i["id"] for i in return_data]).values("roles", "id")
-        user_map = {}
-        for i in user_list:
-            user_map.setdefault(i["roles"], []).append(i["id"])
-        for i in return_data:
-            i["user_count"] = len(user_map.get(i["id"], []))
-        return JsonResponse({"result": True, "data": {"count": role_count, "items": return_data}})
-
-    @action(methods=["GET"], detail=False, url_path="get_all_roles")
-    @ApiLog("角色管理获取全部角色")
-    def bk_role_manage_all(self, request, *args, **kwargs):
-        """
-        获取全部角色
-        """
-        role_list = SysRole.objects.all().values("id", "role_name")
-        return JsonResponse({"result": True, "data": list(role_list)})
-
-    @action(methods=["POST"], detail=False, url_path="create_role")
-    @ApiLog("角色管理创建角色")
-    @transaction.atomic
-    def create_bk_role_manage(self, request, *args, **kwargs):
-        """
-        创建角色
-        """
-        res = RoleController.create_role_controller(**{"request": request, "self": self})
-
-        return Response(data=res)
-
-    @action(methods=["PUT"], detail=False, url_path="edit_role")
-    @ApiLog("角色管理修改角色")
-    @transaction.atomic
-    def update_bk_role_manage(self, request, *args, **kwargs):
-        """
-        修改角色，内置角色不能编辑
-        """
-        res = RoleController.update_role_controller(**{"request": request, "self": self})
-        return Response(**res)
-
-    @action(methods=["DELETE"], detail=False, url_path="delete_role")
-    @ApiLog("角色管理删除角色")
-    def delete_bk_role_manage(self, request, *args, **kwargs):
-        """
-        删除角色，内置角色不能删除
-        """
-        res = RoleController.delete_role_controller(**{"request": request})
-        return Response(**res)
-
-    @action(methods=["POST"], detail=False, url_path="set_role_menus")
-    @ApiLog("角色管理设置角色菜单权限")
-    def set_bk_role_menus(self, request, *args, **kwargs):
-        """
-        设置角色菜单权限，操作权限，应用权限
-        """
-        res = RoleController.set_role_menus_operates(**{"self": self, "request": request})
-        return Response(**res)
-
-    @action(methods=["GET"], detail=False, url_path="get_role_menus")
-    @ApiLog("角色管获取角色菜单")
-    def get_bk_role_manage_menus(self, request, *args, **kwargs):
-        """
-        获取角色菜单
-        """
-        resource = RoleController.get_role_resources(**{"request": request, "app_key": DB_MENU_IDS})
-        operate_ids = RoleController.get_role_operate_ids(request=request)
-
-        return Response(data={"menus_ids": resource, "operate_ids": operate_ids})
-
-    @action(methods=["GET"], detail=False, url_path="get_role_applications")
-    @ApiLog("角色管理获取角色应用")
-    def get_bk_role_manage_applications(self, request, *args, **kwargs):
-        """
-        获取角色应用
-        """
-        res = RoleController.get_role_resources(**{"request": request, "app_key": DB_APPS})
-        return Response(res)
-
-    @action(methods=["GET"], detail=False, url_path="menus")
-    @ApiLog("查询菜单权限中的监控和资产数据的其他分类")
-    def get_role_other_menus(self, request, *args, **kwargs):
-        """
-        查询菜单权限中的监控和资产数据的其他分类
-        TODO 根据购买的模块 进行把 监控/云/资产进行判断 没有购买的就不返回
-        """
-        res = RoleController.get_menus()
-        return Response(data=res)
-
-    @action(methods=["GET"], detail=False, url_path="applications")
-    @ApiLog("查询weops功能模块")
-    def get_applications(self, request, *args, **kwargs):
-        """
-        查询weops功能模块
-        """
-        res = RoleController.get_applications()
-        return Response(data=res)
-
-    @action(methods=["POST"], detail=True)
-    @ApiLog("通过角色设置用户角色")
-    def role_set_users(self, request, *args, **kwargs):
-        res = RoleController.role_set_users(self=self, request=request)
-        return Response(**res)
-
-    @staticmethod
-    def create_alarmcenter_data(request):
-        request_data = request.data
-        data = {
-            "name": request_data.get("role_name"),
-            "desc": request_data.get("describe"),
-            "type": "self_built",
-            "user_id_list": [],
-            "is_enable": 1,
-            "can_delete": 1,
-            "can_modify": 1,
-            "cookies": request.COOKIES,
-        }
-        res = ApiManager.uac.create_alarmcenter_data(**data)
-        return res
-
-    def relate_alarm_role_user(self, request):
-        self.sync_alarmcenter_user(request)
-        group_data = self.get_group_data(request)
-        group_id = group_data.pop("id")
-        id_data = self.get_user_id(request)
-        group_data["user_id_list"] = id_data
-        group_data["cookies"] = request.COOKIES
-        group_data["url_params"] = {"group_id": group_id}
-        ApiManager.uac.set_alarm_group_user(**group_data)
-
-    def sync_alarmcenter_user(self, request):
-        data = {"cookies": request.COOKIES}
-        ApiManager.uac.sync_alarmcenter_user(**data)
-
-    @staticmethod
-    def get_group_data(request):
-        group_obj = SysRole.objects.filter(id=request.data.get("id")).first()
-        data = {"name": group_obj.role_name, "cookies": request.COOKIES}
-        res = ApiManager.uac.accord_name_search_info(**data)
-        return res.get("data")
-
-    @staticmethod
-    def get_user_id(request):
-        user_id_list = request.data.get("users")
-        user_name_list = list(SysUser.objects.filter(id__in=user_id_list).values_list("bk_username", flat=True))
-        data = {"user_name_list": user_name_list, "cookies": request.COOKIES}
-        res = ApiManager.uac.accord_name_search_userid(**data)
-        return res.get("data")
-
-    # @action(detail=False, methods=["GET"])
-    # @ApiLog("将用户组同步达到告警中心")
-    # def sync_alarm_center_group(self, request):
-    #     all_role_obj = list(SysRole.objects.all().values("role_name", "describe"))
-    #     role_user_map = list(SysUser.objects.annotate(role_id=F("roles")).values("roles__role_name", "bk_username"))
-    #     role_users = {}
-    #     all_role_obj = self.dispose_group_data(role_user_map, role_users, all_role_obj)
-    #     group_data = {"group_data": all_role_obj, "cookies": request.COOKIES}
-    #     res = ApiManager.uac.sync_alarm_center_group(**group_data)
-    #     if not res["result"]:
-    #         raise BlueException("同步告警中心失败，请联系管理员！")
-    #     return Response("用户组同步告警中心成功")
-
-    @staticmethod
-    def dispose_group_data(role_user_map, role_users, all_role_obj):
-        for role_user_obj in role_user_map:
-            if role_user_obj["roles__role_name"] not in role_users:
-                role_users[role_user_obj["roles__role_name"]] = []
-            role_users[role_user_obj["roles__role_name"]].append(role_user_obj["bk_username"])
-        for role_obj in all_role_obj:
-            role_obj["name"] = role_obj.pop("role_name")
-            role_obj["desc"] = role_obj.pop("describe")
-            role_obj["type"] = "self_built"
-            role_obj["is_enable"] = 1
-            role_obj["can_delete"] = 1
-            role_obj["can_modify"] = 1
-            if role_obj["name"] not in role_users:
-                role_obj["user_id_list"] = []
-                continue
-            role_obj["user_id_list"] = role_users[role_obj["name"]]
-        return all_role_obj
 
 
 class MenuManageModelViewSet(ModelViewSet):
@@ -1015,163 +725,6 @@ class MenuManageModelViewSet(ModelViewSet):
         return Response(instance.menu)
 
 
-class InstancesPermissionsModelViewSet(ModelViewSet):
-    """
-    实例权限管理
-    """
-
-    permission_classes = [IsAuthenticated, ManagerPermission]
-    queryset = InstancesPermissions.objects.all()
-    serializer_class = InstancesPermissionsModelSerializer
-    ordering = ["-created_at"]
-    ordering_fields = ["-created_at"]
-    filter_class = InstancesPermissionsFilter
-    pagination_class = LargePageNumberPagination
-
-    @ApiLog("查询实例类型的具体实例列表")
-    @action(methods=["GET"], detail=False)
-    def get_instances(self, request):
-        params = request.GET.dict()
-        result = InstPermissionsUtils.instances(params["instance_type"], params, request, self)
-        if isinstance(result, dict):
-            return Response(result)
-        elif isinstance(result, QuerySet):
-            page = self.paginate_queryset(result)
-            return self.get_paginated_response(page)
-        else:
-            return result
-
-    @ApiLog("查询实例权限的权限类型")
-    @action(methods=["GET"], detail=False)
-    def get_instance_types(self, request):
-        result = InstPermissionsUtils.get_model_attrs()
-        return Response(result)
-
-    @ApiLog("查询实例权限的权限类型")
-    @action(methods=["GET"], detail=False)
-    def get_monitor_attrs(self, request):
-        params = request.GET.dict()
-        bk_obj_id = params.get("bk_obj_id")
-        instance_type = params.get("instance_type")
-        result = InstPermissionsUtils.get_monitor_and_monitor_policy_attr(instance_type, bk_obj_id)
-        return Response(result)
-
-    @ApiLog("查询实例权限详情")
-    def retrieve(self, request, *args, **kwargs):
-        # TODO 返回选择实例的详情给前端回显
-        instance = self.get_object()
-        res = {
-            "instance_type": instance.instance_type,
-            "permissions": instance.permissions,
-            "role": instance.role.id,
-            "instances": instance.instances,
-        }
-        return Response(data=res)
-
-    @ApiLog("查询实例权限列表")
-    def list(self, request, *args, **kwargs):
-        return super(InstancesPermissionsModelViewSet, self).list(request, *args, **kwargs)
-
-    @ApiLog("创建实例权限对象")
-    def create(self, request, *args, **kwargs):
-        result = {}
-        with transaction.atomic():
-            sid = transaction.savepoint()
-            serializer = self.get_serializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            self.perform_create(serializer)
-            OperationLog.objects.create(
-                operator=request.user.get('username', None),
-                operate_type=OperationLog.ADD,
-                operate_obj=request.data["instance_type"],
-                operate_summary="创建实例权限对象:【{}".format(request.data["instance_type"]),
-                current_ip=getattr(request, "current_ip", "127.0.0.1"),
-                app_module="系统管理",
-                obj_type="角色管理",
-            )
-            try:
-                inst_data = {"id": serializer.data["id"]}
-                inst_data.update(request.data)
-                policies = CasBinInstService.operator_polices(inst_data)
-                res = CasBinInstService.create_policies(policies=policies, sec="p", ptype="p")
-                if not res:
-                    raise Exception(res)
-            except Exception as err:
-                logger.exception("新增policy到casbin失败！创建回滚！error={}".format(err))
-                transaction.savepoint_rollback(sid)
-                transaction.savepoint_commit(sid)
-                result.update(dict(status=500, data={"success": False, "detail": "创建失败！请联系管理员"}))
-
-        return Response(**result)
-
-    @ApiLog("修改实例权限对象")
-    def update(self, request, *args, **kwargs):
-        result = {}
-        with transaction.atomic():
-            sid = transaction.savepoint()
-            partial = kwargs.pop("partial", False)
-            instance = self.get_object()
-            serializer = self.get_serializer(instance, data=request.data, partial=partial)
-            serializer.is_valid(raise_exception=True)
-            self.perform_update(serializer)
-            OperationLog.objects.create(
-                operator=request.user.get('username', None),
-                operate_type=OperationLog.MODIFY,
-                operate_obj=instance.instance_type,
-                operate_summary="修改实例权限对象:【{}".format(instance.instance_type),
-                current_ip=getattr(request, "current_ip", "127.0.0.1"),
-                app_module="系统管理",
-                obj_type="角色管理",
-            )
-            try:
-                # 删除掉旧的 新增新的
-                remove_res = CasBinInstService.remove_filter_policies(
-                    sec="p", ptype="p", field_index=4, field_values=instance.id
-                )
-                if not remove_res:
-                    raise Exception(remove_res)
-
-                inst_data = {"id": serializer.data["id"]}
-                inst_data.update(request.data)
-                # policies = CasBinInstService.operator_polices(inst_data)
-                # res = CasBinInstService.create_policies(policies=policies, sec="p", ptype="p")
-                # if not res:
-                #     raise Exception(res)
-            except Exception as err:
-                logger.exception("新增policy到casbin失败！创建回滚！error={}".format(err))
-                transaction.savepoint_rollback(sid)
-                transaction.savepoint_commit(sid)
-                result.update(dict(status=500, data={"success": False, "detail": "修改失败！请联系管理员"}))
-
-        return Response(**result)
-
-    @ApiLog("删除实例权限对象")
-    def destroy(self, request, *args, **kwargs):
-        result = {}
-        with transaction.atomic():
-            sid = transaction.savepoint()
-            instance = self.get_object()
-            self.perform_destroy(instance)
-            OperationLog.objects.create(
-                operator=request.user.get('username', None),
-                operate_type=OperationLog.DELETE,
-                operate_obj=instance.instance_type,
-                operate_summary="删除实例权限对象:【{}".format(instance.instance_type),
-                current_ip=getattr(request, "current_ip", "127.0.0.1"),
-                app_module="系统管理",
-                obj_type="角色管理",
-            )
-            remove_res = CasBinInstService.remove_filter_policies(
-                sec="p", ptype="p", field_index=4, field_values=instance.id
-            )
-            if not remove_res:
-                transaction.savepoint_rollback(sid)
-                transaction.savepoint_commit(sid)
-                result.update(dict(status=500, data={"success": False, "detail": "删除失败！请联系管理员"}))
-
-        return Response(**result)
-
-
 @login_exempt
 def get_is_need_two_factor(request):
     user = request.GET["user"]
@@ -1186,53 +739,6 @@ def get_is_need_two_factor(request):
         return JsonResponse({"result": True, "is_need": False})
     is_white = SysUser.objects.filter(roles__in=[i["id"] for i in white_obj["role"]], bk_username=user).exists()
     return JsonResponse({"result": True, "is_need": not is_white})
-
-
-@login_exempt
-@csrf_exempt
-def send_validate_code_exempt(request):
-    user = json.loads(request.body).get("user", "")
-    result = _send_validate_code(user)
-    return JsonResponse(result)
-
-
-def _send_validate_code(user):
-    sys_set = SysSetting.objects.filter(key="auth_type").first()
-    validate_way = sys_set.real_value[0]
-    validate_code, md5_code = generate_validate_code()
-    if validate_way == "mail":
-        result = send_validate_mail(user, validate_code)
-    else:
-        result = send_validate_msg(user, validate_code)
-    if not result["result"]:
-        return result
-    return {"result": True, "data": {"validate_code": md5_code}}
-
-
-def send_validate_msg(user, validate_code):
-    kwargs = {
-        "receiver__username": user,
-        "content": f"WeOps登录账号验证码：{validate_code}",
-    }
-    client = get_client_by_user("admin")
-    result = client.cmsi.send_sms(kwargs)
-    return result
-
-
-def send_validate_mail(user, validate_code):
-    kwargs = {
-        "receiver__username": user,
-        "title": "WeOps登录验证",
-        "content": f"""<div style="line-height: 32px;">
-尊敬的WeOps用户，您好！<br>
-&emsp;&emsp;您正在进行账号验证操作的验证码为：{validate_code}<br>
-&emsp;&emsp;此验证码只能使用一次，验证成功自动失效<br>
-&emsp;&emsp;(请在30分钟内完成验证，30分钟后验证码失效，您需要重新验证。)<br>
-</div>""",
-    }
-    client = get_client_by_user("admin")
-    result = client.cmsi.send_mail(kwargs)
-    return result
 
 
 def generate_validate_code():
@@ -1250,51 +756,6 @@ class LoginInfoView(views.APIView):
     permission_classes = [KeycloakIsAuthenticated]
 
     def get(self, request: Request) -> Response:
-        # pattern = re.compile(r"weops_saas[-_]+[vV]?([\d.]*)")
-        # version = [i.strip() for i in pattern.findall(os.getenv("FILE_NAME", "weops_saas-3.5.3.tar.gz")) if i.strip()]
-        #
-        # user_super, _, user_menus, chname, operate_ids = get_user_roles(request.user)
-        # notify_day = 30
-        # expired_day = 365
-        #
-        # app_list = apps.get_app_configs()
-        # applications = []
-        # for app in app_list:
-        #     if app.name.startswith("apps."):
-        #         app.name = app.name.replace("apps.", '')
-        #         applications.append(app.name)
-        #     elif app.name.startswith("apps_other."):
-        #         app.name = app.name.replace("apps_other.", '')
-        #         applications.append(app.name)
-        #
-        # # 去重user_menus
-        # user_menus = list(set(user_menus))
-        # # 去重operate_ids
-        # operate_ids = duplicate_removal_operate_ids(operate_ids)
-        #
-        # # 启用的菜单
-        # menu_instance = MenuManage.objects.filter(use=True).first()
-        # weops_menu = menu_instance.menu if menu_instance else []
-        #
-        # return Response(
-        #     {
-        #         "weops_menu": weops_menu,
-        #         "username": request.user.get('username', None),
-        #         "applications": applications or list(MENUS_MAPPING.keys()),  # weops有的权限
-        #         "is_super": user_super,
-        #         "menus": user_menus,
-        #         "chname": chname,
-        #         "operate_ids": operate_ids,
-        #         "role": request.user.role,
-        #         "last_login_addr": getattr(request.user, 'last_login_addr', None) or "",
-        #         # "last_login": request.user.last_login.strftime("%Y-%m-%d %H:%M"),
-        #         "last_login": getattr(request.user, 'last_login', None) or "",
-        #         "token": request.COOKIES.get("token", ""),
-        #         "version": version[0].strip(".") if version else "3.5.3",
-        #         "expired_day": expired_day,
-        #         "notify_day": notify_day,
-        #     }
-        # )
         is_super = False
         try:
             is_super = 'admin' in request.user['resource_access'][settings.KEYCLOAK_SETTINGS['CLIENT_ID']]['roles']

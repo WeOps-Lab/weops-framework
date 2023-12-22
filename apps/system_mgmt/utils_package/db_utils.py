@@ -6,7 +6,6 @@
 
 from apps.system_mgmt.constants import DB_SUPER_USER
 from blueapps.core.exceptions import BlueException
-from blueapps.utils import get_client_by_user
 from utils.app_log import logger
 
 
@@ -25,14 +24,6 @@ def get_role_menus(self, role_objs):
 
 
 class UserUtils(object):
-    @staticmethod
-    def get_bk_user(bk_username):
-        client = get_client_by_user("admin")
-        result = client.usermanage.retrieve_user({"id": bk_username, "lookup_field": "username", "fields": "id"})
-        if not result["result"]:
-            logger.exception(result["message"])
-            raise BlueException()
-        return result["data"]
 
     @classmethod
     def formative_user_data(cls, *args, **kwargs):
@@ -50,20 +41,6 @@ class UserUtils(object):
         user_data["roles"] = normal_role
 
         return user_data
-
-    @classmethod
-    def username_manage_add_user(cls, *args, **kwargs):
-        data = kwargs["data"]
-        cookies = kwargs["cookies"]
-        manage_api = kwargs["manage_api"]
-        manage_api.set_header(cookies)
-        res = manage_api.add_bk_user_manage(data=data)
-        if res["result"]:
-            user_id = cls.get_bk_user(data["username"])
-            if not user_id:
-                res = {"result": False, "message": "查询用户id失败！"}
-            res["data"] = user_id
-        return res
 
     @classmethod
     def formative_update_user_data(cls, *args, **kwargs):

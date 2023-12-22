@@ -10,12 +10,11 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
-from keycloak import KeycloakOpenID, KeycloakOpenIDConnection, KeycloakAdmin
+from keycloak import KeycloakAdmin
 from types import SimpleNamespace
 
 import unittest
-import uuid
-import json
+
 
 class PythonKeycloakTest(unittest.TestCase):
     # def setUp(self):
@@ -121,6 +120,7 @@ class PythonKeycloakTest(unittest.TestCase):
         print(obj.name)
         realms = self.keycloak_admin.get_realms()
         pass
+
 
 if __name__ == '__main__':
     unittest.main()

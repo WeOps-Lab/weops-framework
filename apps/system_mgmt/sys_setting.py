@@ -6,8 +6,6 @@ import random
 import string
 import typing
 
-from apps.system_mgmt import constants
-from apps.system_mgmt.constants import CASBIN_TIME
 from apps.system_mgmt.models import SysSetting, UserSysSetting
 from utils.locals import current_request
 
@@ -51,27 +49,6 @@ class SysSettingOp(object):
         str_list = ["".join(random.sample(string.ascii_uppercase + string.digits, 5)) for _ in range(5)]
         registration_code = "-".join(str_list)
         return registration_code
-
-    def init_config(self, force: bool = True, **kwargs):
-        """
-        初始化CUSTOM_SYSTEM_SETTINGS
-        :param force: 是否强制更新,默认True,强制更新
-        :param kwargs:
-        :return:
-        """
-
-        for _settings in constants.SYSTEM_SETTINGS_INIT_LIST:
-            key = _settings.get("key")
-            value = _settings.get("value")
-            vtype = _settings.get("vtype", SysSetting.STRING)
-            desc = _settings.get("desc", key)
-            if not key:
-                continue
-            value = serializer_value(value, vtype)
-            if key not in ["system_logo", CASBIN_TIME]:
-                self.models.objects.update_or_create(defaults=dict(value=value, desc=desc, vtype=vtype), key=key)
-            else:
-                self.models.objects.get_or_create(defaults=dict(value=value, desc=desc, vtype=vtype), key=key)
 
     def __getattr__(self, key: str) -> str:
         """

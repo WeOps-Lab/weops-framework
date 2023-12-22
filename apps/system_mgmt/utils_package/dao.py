@@ -4,10 +4,9 @@
 # @Date    : 2022-03-25
 # @Author  : windyzhao
 from django.db.models import QuerySet
-from casbin_adapter.models import CasbinRule
 
-from apps.system_mgmt.constants import DB_NORMAL_USER, DB_SUPER_USER
-from apps.system_mgmt.models import SysApps, SysRole, SysUser
+from apps.system_mgmt.constants import DB_NORMAL_USER
+from apps.system_mgmt.models import SysRole, SysUser
 from utils import constants
 
 
@@ -164,56 +163,3 @@ class UserModels(ModelOperate):
         roles = SysRole.objects.filter(id__in=roles_ids)
         user_obj.roles.set(roles)
         return roles
-
-
-class RoleModels(ModelOperate):
-    @classmethod
-    def get_role(cls, role_id):
-        role_object = SysRole.objects.get(id=role_id)
-        return role_object
-
-    @classmethod
-    def get_role_super_bool(cls, *args, **kwargs):
-        """
-        判断此角色是否为超级管理员
-        """
-        self = kwargs["self"]
-        role_id = kwargs["id"]
-        super_bool = self.queryset.get(id=role_id).role_name == DB_SUPER_USER
-        return super_bool
-
-    @classmethod
-    def get_role_resource(cls, role_id, app_key):
-        """
-        获取角色对应的资源
-        """
-        try:
-            instance = SysApps.objects.get(sys_role_id=role_id, app_key=app_key)
-            resource = instance.app_ids
-        except SysApps.DoesNotExist:
-            resource = []
-
-        return resource
-
-    @classmethod
-    def set_role_resource(cls, role_id, data):
-        """
-        创建角色对应的资源
-        """
-        sys_apps = SysApps.objects.filter(sys_role_id=role_id, app_key=data["app_key"])
-        if sys_apps.exists():
-            sys_apps.update(**data)
-        else:
-            SysApps.objects.create(**data)
-
-    @classmethod
-    def delete_policy(cls, role_name):
-        """
-        删除casbin的policy
-        """
-        CasbinRule.objects.filter(ptype="g", v1=role_name).delete()
-        CasbinRule.objects.filter(ptype="p", v0=role_name).delete()
-
-    @classmethod
-    def reset_role_policy(cls, role_name):
-        CasbinRule.objects.filter(ptype="p", v0=role_name).delete()

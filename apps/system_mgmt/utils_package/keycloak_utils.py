@@ -4,7 +4,6 @@ import os
 import requests
 from django.conf import LazySettings
 from keycloak import KeycloakOpenID, KeycloakOpenIDConnection, KeycloakAdmin
-import io
 
 
 class KeycloakUtils:
