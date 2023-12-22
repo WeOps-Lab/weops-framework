@@ -2,8 +2,6 @@
 
 from django.conf import settings
 
-from apps.system_mgmt.common_utils.bk_api_utils.main import SiteConfig
-
 
 def custom_settings(request):
     """
@@ -18,17 +16,7 @@ def custom_settings(request):
         # JOB 访问地址
         "JOB_HREF": settings.JOB_URL,
         # weops app code
-        "WEOPS_APP_CODE": SiteConfig.WEOPS,
-        # 统一告警中心 app code
-        "UAC_APP_CODE": SiteConfig.UAC,
-        # 统一监控中心 app code
-        "MONITOR_APP_CODE": SiteConfig.MONITOR,
-        # 流程管理 app code
-        "FLOW_APP_CODE": SiteConfig.FLOW,
-        # 一键补丁安装 app code
-        "PATCH_APP_CODE": SiteConfig.PATCH,
-        # 数字运营中心 app code
-        "OPS_APP_CODE": SiteConfig.OPS,
+        "WEOPS_APP_CODE": settings.APP_CODE,
         # weops微信端事件匹配名
         "WX_ENVENT_NAME": settings.WX_ENVENT_NAME,
         # 控制台绑定微信的类型(wx微信,qywx企业微信)

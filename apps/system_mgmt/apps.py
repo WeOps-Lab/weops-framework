@@ -21,10 +21,6 @@ class SystemManagementConfig(AppConfig):
     verbose_name = _("system_mgmt")
 
     def ready(self):
-        from apps.system_mgmt.utils import post_migrate_init
-
-        post_migrate.connect(post_migrate_init, sender=self)
-
         # TODO 初始化keycloak
         from apps.system_mgmt.utils import init_keycloak
         post_migrate.connect(init_keycloak, sender=self)

@@ -6,7 +6,7 @@ from rest_framework.fields import empty
 from rest_framework.relations import RelatedField
 from rest_framework.serializers import ModelSerializer
 
-from apps.system_mgmt.constants import DB_SUPER_USER, PERMISSIONS_MAPPING
+from apps.system_mgmt.constants import DB_SUPER_USER
 from apps.system_mgmt.models import InstancesPermissions, MenuManage, OperationLog, SysRole, SysSetting, SysUser
 from apps.system_mgmt.sys_setting import serializer_value
 from utils.tools import UploadFileUtils
@@ -177,49 +177,7 @@ class SysUserSerializer(ModelSerializer):
         return res
 
 
-class SysRoleSerializer(ModelSerializer):
-    is_super = serializers.SerializerMethodField()
-    users = serializers.SerializerMethodField()
-
-    class Meta:
-        model = SysRole
-        fields = ("id", "role_name", "describe", "built_in", "is_super", "created_at", "users")
-
-    @staticmethod
-    def get_is_super(obj):
-        return obj.role_name == DB_SUPER_USER
-
-    @staticmethod
-    def get_users(obj):
-        res = [
-            {"id": i.id, "bk_user_id": i.bk_user_id, "bk_username": i.bk_username, "chname": i.chname}
-            for i in obj.sysuser_set.all()
-        ]
-        return res
-
-
 class MenuManageModelSerializer(ModelSerializer):
     class Meta:
         model = MenuManage
         fields = "__all__"
-
-
-class InstancesPermissionsModelSerializer(ModelSerializer):
-    count = serializers.SerializerMethodField()
-    permissions_text = serializers.SerializerMethodField()
-
-    @staticmethod
-    def get_count(instance):
-        return len(instance.instances)
-
-    @staticmethod
-    def get_permissions_text(instance):
-        return ",".join([PERMISSIONS_MAPPING[k] for k, v in instance.permissions.items() if v and k != "bk_obj_id"])
-
-    class Meta:
-        model = InstancesPermissions
-        fields = "__all__"
-        extra_kwargs = {
-            "instances": {"write_only": True},
-            "permissions": {"write_only": True},
-        }

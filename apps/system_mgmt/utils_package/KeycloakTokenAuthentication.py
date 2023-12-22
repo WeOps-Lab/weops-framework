@@ -2,15 +2,10 @@ from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 from django.contrib.auth.models import User
 from django.core.handlers.wsgi import WSGIRequest
-from keycloak import KeycloakOpenID
 from django.conf import LazySettings
-from django.contrib.auth import get_user_model
 
-from apps.system_mgmt.models import SysUser
 from apps.system_mgmt.utils_package.keycloak_utils import KeycloakUtils
-from apps.system_mgmt.utils_package.controller import KeycloakUserController
-from keycloak import KeycloakAdmin
-from keycloak import KeycloakOpenIDConnection
+
 
 settings = LazySettings()
 
