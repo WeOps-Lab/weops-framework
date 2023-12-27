@@ -120,6 +120,14 @@ class PythonKeycloakTest(unittest.TestCase):
         realms = self.keycloak_admin.get_realms()
         pass
 
+    def test_login_code(self):
+        tk = self.keycloak_openid.token(
+            grant_type='authorization_code',
+            code='eb08fd1e-a50f-4108-a831-6625701a0ee9.da1edc58-e3ce-4e0c-899b-597c7d7c65a7.a72a5bed-8673-48e1-ac0a-97ba3c06c88f',
+            redirect_uri='http://localhost:8000'
+        )
+        pass
+
     def test_groups(self):
         g_query = {
             'search':'555',

@@ -29,6 +29,7 @@ urlpatterns = [
     url(r"login_info/$", views.LoginInfoView.as_view()),
     # 用户登录
     url(r"keycloak_login/$", views.KeycloakLoginView.as_view()),
+    url(r"keycloak_code_login/$", views.KeycloakCodeLoginView.as_view()),
 ]
 
 router = DefaultRouter()

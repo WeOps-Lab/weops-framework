@@ -413,6 +413,31 @@ class KeycloakLoginView(views.APIView):
         else:
             return Response({'token': token}, status=status.HTTP_200_OK)
 
+class KeycloakCodeLoginView(views.APIView):
+    '''
+    该类用作验证登录
+    '''
+    authentication_classes = []
+    permission_classes = []
+
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'code': openapi.Schema(type=openapi.TYPE_STRING, description='code')
+            }
+        ),
+    )
+    def post(self, request: Request) -> Response:
+        # 从请求中获取code
+        code = request.data.get('code', None)
+        if code is None:
+            return Response({'error': 'no code found'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            token = KeycloakUserController.get_token_from_code(code)
+            return Response({'token': token}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_401_UNAUTHORIZED)
 
 class KeycloakUserViewSet(viewsets.ViewSet):
     authentication_classes = [KeycloakTokenAuthentication]

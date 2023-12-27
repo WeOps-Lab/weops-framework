@@ -896,6 +896,15 @@ class KeycloakUserController(object):
         return token.get('access_token', None)
 
     @classmethod
+    def get_token_from_code(cls, code) :
+        token = cls.keycloak_utils().get_keycloak_openid().token(
+            grant_type='authorization_code',
+            code = code,
+            redirect_uri= 'http://localhost:8000'
+        )
+        return token.get('access_token', None)
+
+    @classmethod
     def create_user(cls, user) -> str:
         '''
         返回的字典包含新创建用户的id
