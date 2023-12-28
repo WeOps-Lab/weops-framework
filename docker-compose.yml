@@ -32,7 +32,7 @@ services:
       - "4002:4002"
 
   keycloak:
-    image: quay.io/keycloak/keycloak:22.0.5
+    image: quay.io/keycloak/keycloak:23.0.3
     container_name: keycloak-container
     environment:
       - KEYCLOAK_ADMIN=admin
@@ -40,6 +40,8 @@ services:
     ports:
       - "8080:8080"
     command: start-dev
+    volumes:
+      - ./templates/my_custom_theme:/opt/keycloak/themes/my_custom_theme
 
   weops-lite:
     build:

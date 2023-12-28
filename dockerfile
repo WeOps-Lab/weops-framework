@@ -15,7 +15,7 @@ WORKDIR /app
 COPY . /app/
 
 # 安装项目依赖项，可以根据你的项目使用 pip 或 pipenv
-RUN pip install -r requirements.txt
+RUN pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple/
 
 # 运行 Django 应用程序，可以根据需要修改
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]

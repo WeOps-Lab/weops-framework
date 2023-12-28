@@ -22,7 +22,8 @@ from django.conf import settings
 from django.db import transaction
 from django.db.models import Q, QuerySet
 from django.db.transaction import atomic
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseRedirect
+from django.shortcuts import redirect
 from rest_framework.request import Request
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
@@ -411,7 +412,9 @@ class KeycloakLoginView(views.APIView):
             # 用户验证失败，返回错误响应
             return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
         else:
-            return Response({'token': token}, status=status.HTTP_200_OK)
+            res = Response({'token': token}, status=status.HTTP_200_OK)
+            res.set_cookie('token', token)
+            return res
 
 class KeycloakCodeLoginView(views.APIView):
     '''
@@ -421,21 +424,25 @@ class KeycloakCodeLoginView(views.APIView):
     permission_classes = []
 
     @swagger_auto_schema(
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'code': openapi.Schema(type=openapi.TYPE_STRING, description='code')
-            }
-        ),
+        manual_parameters=[
+            openapi.Parameter('code', in_=openapi.IN_QUERY, type=openapi.TYPE_STRING)
+        ],
+        operation_description='用作登录后的重定向，根据请求的code获取token，获取完回到主页'
     )
-    def post(self, request: Request) -> Response:
+    def get(self, request: Request) :
         # 从请求中获取code
-        code = request.data.get('code', None)
+        code = request.query_params.get('code', None)
         if code is None:
             return Response({'error': 'no code found'}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            token = KeycloakUserController.get_token_from_code(code)
-            return Response({'token': token}, status=status.HTTP_200_OK)
+            token = KeycloakUserController.get_token_from_code(code, request.build_absolute_uri().split('?')[0])
+            print(f'token get from code: {token}')
+            # response = Response(status=302)
+            # response['Location'] = request.build_absolute_uri('/')
+            # response.set_cookie('token', token)
+            response = HttpResponseRedirect(request.build_absolute_uri('/'))
+            response.set_cookie('token', token)
+            return response
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -764,6 +771,7 @@ class KeycloakGroupViewSet(viewsets.ViewSet):
             openapi.Parameter('search', in_=openapi.IN_QUERY, type=openapi.TYPE_STRING),
         ]
     )
+    @check_keycloak_permission('SysGroup_view')
     def list(self, request: Request):
         """
         查询组
@@ -777,6 +785,7 @@ class KeycloakGroupViewSet(viewsets.ViewSet):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @swagger_auto_schema()
+    @check_keycloak_permission('SysGroup_view')
     def retrieve(self, request: Request, pk: str):
         '''
         获取一个组以及其子组
@@ -798,6 +807,7 @@ class KeycloakGroupViewSet(viewsets.ViewSet):
             required=['group_name']
         )
     )
+    @check_keycloak_permission('SysGroup_create')
     def create(self, request: Request):
         """
         创建一个组，如有父组织请添加字段parent_group_id
@@ -821,6 +831,7 @@ class KeycloakGroupViewSet(viewsets.ViewSet):
             required=['group_name']
         )
     )
+    @check_keycloak_permission('SysGroup_edit')
     def update(self, request: Request, pk: str):
         """
         修改组名
@@ -841,6 +852,7 @@ class KeycloakGroupViewSet(viewsets.ViewSet):
         )
     )
     @action(detail=False, methods=['delete'])
+    @check_keycloak_permission('SysGroup_delete')
     def delete_groups(self, request: Request):
         """
         删除组
@@ -862,6 +874,7 @@ class KeycloakGroupViewSet(viewsets.ViewSet):
         operation_description='获取该组下的所有用户'
     )
     @action(detail=True, methods=['get'], url_path='users')
+    @check_keycloak_permission('SysGroup_user')
     def get_users_in_group(self, request: Request, pk: str):
         try:
             users = KeycloakGroupController.get_group_users(pk,
@@ -879,6 +892,7 @@ class KeycloakGroupViewSet(viewsets.ViewSet):
         operation_description='将一系列用户添加到组'
     )
     @action(detail=True, methods=['patch'], url_path='assign_users')
+    @check_keycloak_permission('SysGroup_user')
     def assign_group_users(self, request: Request, pk: str):
         try:
             ids = request.data
@@ -897,6 +911,7 @@ class KeycloakGroupViewSet(viewsets.ViewSet):
         operation_description='将一系列用户从组移除'
     )
     @action(detail=True, methods=['delete'], url_path='unassign_users')
+    @check_keycloak_permission('SysGroup_user')
     def unassigned_group_users(self, request: Request, pk: str):
         try:
             ids = request.data
@@ -909,6 +924,7 @@ class KeycloakGroupViewSet(viewsets.ViewSet):
 
     @swagger_auto_schema(operation_description='获取该组下的所有角色')
     @action(detail=True, methods=['get'], url_path='roles')
+    @check_keycloak_permission('SysGroup_role')
     def get_roles_in_group(self, request: Request, pk: str):
         try:
             roles = KeycloakGroupController.get_group_roles(pk)
@@ -924,6 +940,7 @@ class KeycloakGroupViewSet(viewsets.ViewSet):
         operation_description='将一系列角色添加到组'
     )
     @action(detail=True, methods=['patch'], url_path='assign_roles')
+    @check_keycloak_permission('SysGroup_role')
     def assign_group_roles(self, request: Request, pk: str):
         try:
             ids = request.data
@@ -942,6 +959,7 @@ class KeycloakGroupViewSet(viewsets.ViewSet):
         operation_description='将一系列角色从组移除'
     )
     @action(detail=True, methods=['delete'], url_path='unassign_roles')
+    @check_keycloak_permission('SysGroup_role')
     def unassigned_group_roles(self, request: Request, pk: str):
         try:
             ids = request.data

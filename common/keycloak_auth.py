@@ -26,13 +26,9 @@ class KeycloakTokenAuthentication(BaseAuthentication):
         '''
         该函数返回的信息会被塞到request的属性user和auth中
         '''
-        auth_header: str = request.headers.get('Authorization', None)
-        if not auth_header:
-            raise AuthenticationFailed('Authorization header needed')
-        header_seps = auth_header.split(' ')
-        if len(header_seps) != 2:
-            raise AuthenticationFailed('Authorization header format error')
-        token = header_seps[1]
+        token: str = request.COOKIES.get('token', None)
+        if not token:
+            raise AuthenticationFailed('token cookie is needed')
         return self.authenticate_credentials(token)
 
     def authenticate_credentials(self, token: str):
