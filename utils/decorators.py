@@ -8,7 +8,7 @@ from django.core.cache import cache
 from django.views.generic.base import View
 
 from utils import constants
-from utils.app_log import logger, api_logger
+from utils.app_log import api_logger, logger
 from utils.exceptions import CustomApiException
 
 
@@ -110,7 +110,10 @@ def get_all_page(max_count=200):
     def outer(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            limit = kwargs.get("page", {}).get("limit", 10)
+            if not kwargs:
+                limit = -1
+            else:
+                limit = kwargs.get("page", {}).get("limit", 10)
             count, data = 0, []
             if limit == -1:
                 kwargs.get("page", {}).update(start=0)
