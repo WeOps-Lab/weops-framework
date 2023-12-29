@@ -112,6 +112,7 @@ def get_all_page(max_count=200):
         def wrapper(*args, **kwargs):
             if not kwargs:
                 limit = -1
+                kwargs = {"page": {"limit": -1}}
             else:
                 if not kwargs.get("page"):
                     kwargs["page"] = {"limit": -1}
