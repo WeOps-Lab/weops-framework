@@ -113,7 +113,9 @@ def get_all_page(max_count=200):
             if not kwargs:
                 limit = -1
             else:
-                limit = kwargs.get("page", {}).get("limit", 10)
+                if not kwargs.get("page"):
+                    kwargs["page"] = {"limit": -1}
+                limit = kwargs["page"].get("limit", 10)
             count, data = 0, []
             if limit == -1:
                 kwargs.get("page", {}).update(start=0)
