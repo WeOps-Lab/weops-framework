@@ -381,6 +381,15 @@ class KeycloakUserController(object):
         return token.get('access_token', None)
 
     @classmethod
+    def get_token_from_code(cls, code, redirect_uri) :
+        token = cls.keycloak_utils().get_keycloak_openid().token(
+            grant_type='authorization_code',
+            code = code,
+            redirect_uri= redirect_uri
+        )
+        return token.get('access_token', None)
+
+    @classmethod
     def create_user(cls, user) -> str:
         '''
         返回的字典包含新创建用户的id
@@ -395,14 +404,27 @@ class KeycloakUserController(object):
         return id
 
     @classmethod
-    def get_user_list(cls, page, per_page, search):
+    def get_user_list(cls, page, per_page, search, role_ids):
         first = (page - 1) * per_page
         max = per_page
         params = {"first": first, "max": max, "search": search}
         users = cls.keycloak_utils().get_keycloak_admin().get_users(params)
         id_of_client = cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT']
         for user in users:
+            user['groups']= cls.keycloak_utils().get_keycloak_admin().get_user_groups(user['id'])
+            user['group_roles'] = list()
+            for group in user['groups']:
+                roles = cls.keycloak_utils().get_keycloak_admin().get_group_client_roles(group['id']
+                                        , cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
+                user['group_roles'].extend(roles)
             user['roles'] = cls.keycloak_utils().get_keycloak_admin().get_client_roles_of_user(user['id'], id_of_client)
+        # 根据roles字段筛用户
+        if len(role_ids) != 0:
+            users = [
+                user for user in users if
+                any(role['id'] in role_ids for role in user['roles']) or
+                any(group_role['id'] in role_ids for group_role in user['group_roles'])
+            ]
         return {"count": len(users), "users": users}
 
     @classmethod
@@ -504,8 +526,14 @@ class KeycloakRoleController:
         根据角色id获取其详情以及其所拥有的权限
         """
         role = cls.keycloak_utils().get_role_by_id(role_id)
+        # 获取拥有该角色的组
+        groups = cls.keycloak_utils().get_keycloak_admin().get_client_role_groups(
+            cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'],
+            role['name'])
+        role['groups'] = groups
         # 获取相关policy，并记录其id
-        policies = cls.keycloak_utils().get_keycloak_admin().get_client_authz_policies(cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
+        policies = cls.keycloak_utils().get_keycloak_admin().get_client_authz_policies(
+            cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
         for policy in policies:
             if policy['name'] == role['name']:
                 role['policy_id'] = policy['id']
@@ -595,21 +623,15 @@ class KeycloakRoleController:
         """
         配置permission中的role(policy)
         """
-        # 1.获取permissions
-        permissions = list()
+        # 1.获取permissions，顺序按照permission_ids的顺序排布
         ps = cls.keycloak_utils().get_keycloak_admin().get_client_authz_permissions(
             cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
-        for p in ps:
-            if p['id'] in permission_ids:
-                permissions.append(p)
+        permissions = sorted([item for item in ps if item['id'] in permission_ids], key=lambda x: permission_ids.index(x['id']))
         # 2.获取所有permission相关的resources的id
-        # resources = [[r['_id']] for p_id in permission_ids for r in
-        #              cls.keycloak_utils().get_resources_by_permission(p_id)]
         resources = list()
         for p_id in permission_ids:
             resources.append(list(map(lambda r: r['_id'], cls.keycloak_utils().get_resources_by_permission(p_id))))
         # 3.获取所有permission相关policy的id
-        # policies = [[p['id']] for p_id in permission_ids for p in cls.keycloak_utils().get_policy_by_permission(p_id)]
         policies = list()
         for p_id in permission_ids:
             policies.append(list(map(lambda p: p['id'], cls.keycloak_utils().get_policy_by_permission(p_id))))
@@ -651,6 +673,40 @@ class KeycloakRoleController:
                                                                      role['name'],
                                                                      role)
 
+    @classmethod
+    def assign_role_groups(cls, role_id: str, group_ids: list):
+        """
+        将角色添加到一系列组织中
+        """
+        role_d = cls.keycloak_utils().get_role_by_id(role_id)
+        role = {
+            'id': role_id,
+            'name': role_d['name']
+        }
+        for group_id in group_ids:
+            cls.keycloak_utils().get_keycloak_admin().assign_group_client_roles(
+                group_id,
+                cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'],
+                [role]
+            )
+
+    @classmethod
+    def unassign_role_groups(cls, role_id: str, group_ids: list):
+        """
+        将角色从一系列组织中移除
+        """
+        role_d = cls.keycloak_utils().get_role_by_id(role_id)
+        role = {
+            'id': role_id,
+            'name': role_d['name']
+        }
+        for group_id in group_ids:
+            cls.keycloak_utils().get_keycloak_admin().delete_group_client_roles(
+                group_id,
+                cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'],
+                [role]
+            )
+
 
 class KeycloakPermissionController:
     '''
@@ -681,13 +737,14 @@ class KeycloakPermissionController:
         all_permissions = cls.keycloak_utils().get_keycloak_admin().get_client_authz_permissions(
             cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
         ps = [{'name': d['name'], 'des': d['description'], 'id':d['id'], 'allow': False} for d in all_permissions if d['name'] != 'Default Permission']
+        pd = dict()
         try:
+            # 如没有权限，该方法报错
             allow_p = cls.keycloak_utils().get_keycloak_openid().uma_permissions(token)
             p_list = [d['rsname'] for d in allow_p]
             for permission in ps:
                 if permission['name'] in p_list:
                     permission['allow'] = True
-            pd = dict()
             for permission in ps:
                 strs = permission['name'].split("_")
                 if not pd.get(strs[0], None):
@@ -705,3 +762,146 @@ class KeycloakPermissionController:
         except Exception as e:
             return False
         return True
+
+class KeycloakGroupController:
+    '''
+    组操作
+    '''
+
+    # keycloak_utils: KeycloakUtils = KeycloakUtils()
+    _keycloak_utils = None
+
+    @classmethod
+    def keycloak_utils(cls):
+        if cls._keycloak_utils is None:
+            cls._keycloak_utils = KeycloakUtils()
+        return cls._keycloak_utils
+    _settings = LazySettings()
+
+    @classmethod
+    def get_groups(cls, page, per_page, search = ''):
+        """
+        查询所有组
+        """
+        first = (page - 1) * per_page
+        max = per_page
+        query = {
+            'search': search,
+            'first': first,
+            'max': max
+        }
+        return cls.keycloak_utils().get_keycloak_admin().get_groups(query)
+
+    @classmethod
+    def get_group(cls, group_id):
+        """
+        获取一个组
+        """
+        return cls.keycloak_utils().get_keycloak_admin().get_group(group_id)
+
+    @classmethod
+    def create_group(cls, group_name, parent_group_id = None) -> str:
+        """
+        创建一个组，根据parent_group_id是否为空来判断是否创建子组
+        """
+        payload = {
+            'name':group_name
+        }
+        return cls.keycloak_utils().get_keycloak_admin().create_group(payload, parent_group_id)
+
+    @classmethod
+    def update_group(cls, group_id, group_name):
+        """
+        更新组，只能改名
+        """
+        payload = {
+            'name':group_name
+        }
+        cls.keycloak_utils().get_keycloak_admin().update_group(group_id, payload)
+
+    @classmethod
+    def delete_group(cls, group_ids: list):
+        """
+        删除组
+        """
+        for group_id in group_ids:
+            cls.keycloak_utils().get_keycloak_admin().delete_group(group_id)
+
+    @classmethod
+    def assign_group_user(cls,group_id, user_ids: list):
+        """
+        关联组和用户
+        """
+        for user_id in user_ids:
+            cls.keycloak_utils().get_keycloak_admin().group_user_add(user_id, group_id)
+
+
+    @classmethod
+    def unassigned_group_user(cls, group_id, user_ids: list):
+        """
+        取消关联组和用户
+        """
+        for user_id in user_ids:
+            cls.keycloak_utils().get_keycloak_admin().group_user_remove(user_id, group_id)
+
+    @classmethod
+    def assign_user_group(cls, user_id, group_ids: list):
+        """
+        关联组和用户
+        """
+        for group_id in group_ids:
+            cls.keycloak_utils().get_keycloak_admin().group_user_add(user_id, group_id)
+
+    @classmethod
+    def unassigned_user_group(cls, user_id, group_ids: list):
+        """
+        取消关联组和用户
+        """
+        for group_id in group_ids:
+            cls.keycloak_utils().get_keycloak_admin().group_user_remove(user_id, group_id)
+
+    @classmethod
+    def get_group_users(cls, group_id, page, per_page)-> list:
+        """
+        获取一个组下的用户
+        """
+        first = (page - 1) * per_page
+        max = per_page
+        query = {
+            'first': first,
+            'max': max
+        }
+        return cls.keycloak_utils().get_keycloak_admin().get_group_members(group_id, query)
+
+    @classmethod
+    def assign_group_role(cls, group_id, client_role_ids : list):
+        """
+        关联组和客户端角色
+        """
+        # 需要name和id作为payload
+        roles_d = [cls.keycloak_utils().get_role_by_id(id) for id in client_role_ids]
+        roles = [{'id':r['id'], 'name':r['name']} for r in roles_d]
+        cls.keycloak_utils().get_keycloak_admin().assign_group_client_roles(group_id,
+                                                                            cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'],
+                                                                            roles)
+
+    @classmethod
+    def unassigned_group_role(cls, group_id, client_role_ids: list):
+        """
+        取消关联组和客户端角色
+        """
+        roles_d = [cls.keycloak_utils().get_role_by_id(id) for id in client_role_ids]
+        roles = [{'id': r['id'], 'name': r['name']} for r in roles_d]
+        cls.keycloak_utils().get_keycloak_admin().delete_group_client_roles(group_id,
+                                                                            cls._settings.KEYCLOAK_SETTINGS[
+                                                                                'ID_OF_CLIENT'],
+                                                                            roles)
+
+    @classmethod
+    def get_group_roles(cls, group_id) -> list:
+        """
+        获取与该组关联的角色
+        """
+        return cls.keycloak_utils().get_keycloak_admin().get_group_client_roles(group_id,
+                                                                                cls._settings.KEYCLOAK_SETTINGS['ID_OF_CLIENT'])
+

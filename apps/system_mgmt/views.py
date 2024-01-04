@@ -11,15 +11,21 @@ an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express o
 specific language governing permissions and limitations under the License.
 """
 import hashlib
+import json
 import os
 import random
-
+import re
+import string
+import time
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q
-from django.http import JsonResponse
+from django.db.models import Q, QuerySet
+from django.db.transaction import atomic
+from django.http import JsonResponse, HttpResponseRedirect
+from django.shortcuts import redirect
 from rest_framework.request import Request
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -32,14 +38,17 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from apps.system_mgmt import constants as system_constants
-from apps.system_mgmt.utils_package.KeycloakTokenAuthentication import KeycloakTokenAuthentication
-from apps.system_mgmt.utils_package.KeycloakIsAutenticated import KeycloakIsAuthenticated
+from common.keycloak_auth import KeycloakTokenAuthentication
+from common.keycloak_auth import KeycloakIsAuthenticated
 from apps.system_mgmt.filters import (
+    InstancesPermissionsFilter,
     MenuManageFilter,
     NewSysUserFilter,
     OperationLogFilter,
+    SysRoleFilter,
+    SysUserFilter,
 )
-from apps.system_mgmt.models import MenuManage, OperationLog, SysSetting, SysUser
+from apps.system_mgmt.models import InstancesPermissions, MenuManage, OperationLog, SysRole, SysSetting, SysUser
 from apps.system_mgmt.pages import LargePageNumberPagination
 from apps.system_mgmt.serializers import (
     LogSerializer,
@@ -169,7 +178,40 @@ class KeycloakLoginView(views.APIView):
             # 用户验证失败，返回错误响应
             return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
         else:
-            return Response({'token': token}, status=status.HTTP_200_OK)
+            res = Response({'token': token}, status=status.HTTP_200_OK)
+            res.set_cookie('token', token)
+            return res
+
+
+class KeycloakCodeLoginView(views.APIView):
+    '''
+    该类用作验证登录
+    '''
+    authentication_classes = []
+    permission_classes = []
+
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter('code', in_=openapi.IN_QUERY, type=openapi.TYPE_STRING)
+        ],
+        operation_description='用作登录后的重定向，根据请求的code获取token，获取完回到主页'
+    )
+    def get(self, request: Request):
+        # 从请求中获取code
+        code = request.query_params.get('code', None)
+        if code is None:
+            return Response({'error': 'no code found'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            token = KeycloakUserController.get_token_from_code(code, request.build_absolute_uri().split('?')[0])
+            print(f'token get from code: {token}')
+            # response = Response(status=302)
+            # response['Location'] = request.build_absolute_uri('/')
+            # response.set_cookie('token', token)
+            response = HttpResponseRedirect(request.build_absolute_uri('/'))
+            response.set_cookie('token', token)
+            return response
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_401_UNAUTHORIZED)
 
 
 class KeycloakUserViewSet(viewsets.ViewSet):
@@ -181,14 +223,24 @@ class KeycloakUserViewSet(viewsets.ViewSet):
             openapi.Parameter('page', in_=openapi.IN_QUERY, type=openapi.TYPE_INTEGER),
             openapi.Parameter('per_page', in_=openapi.IN_QUERY, type=openapi.TYPE_INTEGER),
             openapi.Parameter('search', in_=openapi.IN_QUERY, type=openapi.TYPE_STRING),
+            openapi.Parameter('roles', in_=openapi.IN_QUERY, type=openapi.TYPE_ARRAY, items=openapi.TYPE_STRING),
         ]
     )
     @check_keycloak_permission('SysUser_view')
     def list(self, request: Request):
         page = request.query_params.get("page", 1)  # 获取请求中的页码参数，默认为第一页
         per_page = request.query_params.get("per_page", 10)  # 获取请求中的每页结果数，默认为10
-        res = KeycloakUserController.get_user_list(**{"page": int(page), "per_page": int(per_page)
-            , "search": request.query_params.get('search', None)})
+        roles = []
+        try:
+            roles_p = request.query_params.get('roles', None)
+            if roles_p:
+                roles = eval(roles_p)
+        except Exception as e:
+            return Response({'error': 'roles format error'}, status=status.HTTP_400_BAD_REQUEST)
+        res = KeycloakUserController.get_user_list(**{"page": int(page),
+                                                      "per_page": int(per_page),
+                                                      "search": request.query_params.get('search', None),
+                                                      'role_ids': roles})
         return Response(res)
 
     @swagger_auto_schema(
@@ -305,6 +357,42 @@ class KeycloakUserViewSet(viewsets.ViewSet):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'id': pk}, status=status.HTTP_200_OK)
 
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_ARRAY,
+            items=openapi.Schema(type=openapi.TYPE_STRING)
+        ),
+        operation_description='将一系列组添加到用户'
+    )
+    @action(detail=True, methods=['patch'], url_path='assign_groups')
+    def assign_user_groups(self, request: Request, pk: str):
+        try:
+            ids = request.data
+            if ids is None or not isinstance(ids, list) or len(ids) == 0:
+                return Response({"error": "check your request data"}, status=status.HTTP_400_BAD_REQUEST)
+            KeycloakGroupController.assign_user_group(pk, ids)
+            return Response({'id': pk}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_ARRAY,
+            items=openapi.Schema(type=openapi.TYPE_STRING)
+        ),
+        operation_description='将一系列组从该用户移除'
+    )
+    @action(detail=True, methods=['delete'], url_path='unassign_groups')
+    def unassign_user_groups(self, request: Request, pk: str):
+        try:
+            ids = request.data
+            if ids is None or not isinstance(ids, list) or len(ids) == 0:
+                return Response({"error": "check your request data"}, status=status.HTTP_400_BAD_REQUEST)
+            KeycloakGroupController.unassigned_user_group(pk, ids)
+            return Response({'id': pk}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class KeycloakRoleViewSet(viewsets.ViewSet):
     authentication_classes = [KeycloakTokenAuthentication]
@@ -317,7 +405,7 @@ class KeycloakRoleViewSet(viewsets.ViewSet):
         获取所有角色
         '''
         res = KeycloakRoleController.get_client_roles()
-        return Response(res)\
+        return Response(res)
 
     @swagger_auto_schema()
     @check_keycloak_permission('SysRole_view')
@@ -371,7 +459,7 @@ class KeycloakRoleViewSet(viewsets.ViewSet):
     @swagger_auto_schema(
         request_body=openapi.Schema(
             type=openapi.TYPE_ARRAY,
-            items={'type': 'string'}
+            items=openapi.Schema(type=openapi.TYPE_STRING)
         ),
         operation_description='更改角色的权限状态，如果有切换为有，反之'
     )
@@ -434,6 +522,42 @@ class KeycloakRoleViewSet(viewsets.ViewSet):
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response({'id': pk}, status=status.HTTP_200_OK)
 
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_ARRAY,
+            items=openapi.Schema(type=openapi.TYPE_STRING)
+        ),
+        operation_description='将该角色添加到一系列组中'
+    )
+    @action(detail=True, methods=['patch'], url_path='assign_groups')
+    def assign_groups(self, request: Request, pk: str):
+        try:
+            ids = request.data
+            if ids is None or not isinstance(ids, list) or len(ids) == 0:
+                return Response({"error": "check your request data"}, status=status.HTTP_400_BAD_REQUEST)
+            KeycloakRoleController.assign_role_groups(pk, ids)
+            return Response({'id': pk}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_ARRAY,
+            items=openapi.Schema(type=openapi.TYPE_STRING)
+        ),
+        operation_description='将该角色从一系列组中移除'
+    )
+    @action(detail=True, methods=['delete'], url_path='unassign_groups')
+    def unassign_groups(self, request: Request, pk: str):
+        try:
+            ids = request.data
+            if ids is None or not isinstance(ids, list) or len(ids) == 0:
+                return Response({"error": "check your request data"}, status=status.HTTP_400_BAD_REQUEST)
+            KeycloakRoleController.unassign_role_groups(pk, ids)
+            return Response({'id': pk}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class KeycloakPermissionViewSet(viewsets.ViewSet):
     authentication_classes = [KeycloakTokenAuthentication]
@@ -448,6 +572,217 @@ class KeycloakPermissionViewSet(viewsets.ViewSet):
             return Response(KeycloakPermissionController.get_permissions(request.auth))
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class KeycloakGroupViewSet(viewsets.ViewSet):
+    authentication_classes = [KeycloakTokenAuthentication]
+    permission_classes = [KeycloakIsAuthenticated]
+
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter('page', in_=openapi.IN_QUERY, type=openapi.TYPE_INTEGER),
+            openapi.Parameter('per_page', in_=openapi.IN_QUERY, type=openapi.TYPE_INTEGER),
+            openapi.Parameter('search', in_=openapi.IN_QUERY, type=openapi.TYPE_STRING),
+        ]
+    )
+    @check_keycloak_permission('SysGroup_view')
+    def list(self, request: Request):
+        """
+        查询组
+        """
+        try:
+            groups = KeycloakGroupController.get_groups(int(request.query_params.get('page', 1))
+                                                        , int(request.query_params.get('per_page', 20))
+                                                        , request.query_params.get('search', ''))
+            return Response(groups, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @swagger_auto_schema()
+    @check_keycloak_permission('SysGroup_view')
+    def retrieve(self, request: Request, pk: str):
+        '''
+        获取一个组以及其子组
+        '''
+        try:
+            group = KeycloakGroupController.get_group(pk)
+            return Response(group, status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        pass
+
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'group_name': openapi.Schema(type=openapi.TYPE_STRING, description='Role name'),
+                'parent_group_id': openapi.Schema(type=openapi.TYPE_STRING, description='description'),
+            },
+            required=['group_name']
+        )
+    )
+    @check_keycloak_permission('SysGroup_create')
+    def create(self, request: Request):
+        """
+        创建一个组，如有父组织请添加字段parent_group_id
+        """
+        try:
+            group_name = request.data.get("group_name", None)
+            if not group_name:
+                return Response({'error': 'group_name are needed'}, status=status.HTTP_400_BAD_REQUEST)
+            g_id = KeycloakGroupController.create_group(group_name, request.data.get('parent_group_id', None))
+            return Response({'id': g_id}, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        pass
+
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                'group_name': openapi.Schema(type=openapi.TYPE_STRING, description='group name')
+            },
+            required=['group_name']
+        )
+    )
+    @check_keycloak_permission('SysGroup_edit')
+    def update(self, request: Request, pk: str):
+        """
+        修改组名
+        """
+        try:
+            group_name = request.data.get("group_name", None)
+            if not group_name:
+                return Response({'error': 'group_name are needed'}, status=status.HTTP_400_BAD_REQUEST)
+            KeycloakGroupController.update_group(pk, group_name)
+            return Response({'id': pk}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_ARRAY,
+            items=openapi.Schema(type=openapi.TYPE_STRING)
+        )
+    )
+    @action(detail=False, methods=['delete'])
+    @check_keycloak_permission('SysGroup_delete')
+    def delete_groups(self, request: Request):
+        """
+        删除组
+        """
+        try:
+            ids = request.data
+            if ids is None or not isinstance(ids, list) or len(ids) == 0:
+                return Response({"error": "check your request data"}, status=status.HTTP_400_BAD_REQUEST)
+            KeycloakGroupController.delete_group(ids)
+            return Response({'id': ""}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter('page', in_=openapi.IN_QUERY, type=openapi.TYPE_INTEGER),
+            openapi.Parameter('per_page', in_=openapi.IN_QUERY, type=openapi.TYPE_INTEGER)
+        ],
+        operation_description='获取该组下的所有用户'
+    )
+    @action(detail=True, methods=['get'], url_path='users')
+    @check_keycloak_permission('SysGroup_user')
+    def get_users_in_group(self, request: Request, pk: str):
+        try:
+            users = KeycloakGroupController.get_group_users(pk,
+                                                            int(request.query_params.get('page', 1)),
+                                                            int(request.query_params.get('per_page', 20)))
+            return Response(users, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_ARRAY,
+            items=openapi.Schema(type=openapi.TYPE_STRING)
+        ),
+        operation_description='将一系列用户添加到组'
+    )
+    @action(detail=True, methods=['patch'], url_path='assign_users')
+    @check_keycloak_permission('SysGroup_user')
+    def assign_group_users(self, request: Request, pk: str):
+        try:
+            ids = request.data
+            if ids is None or not isinstance(ids, list) or len(ids) == 0:
+                return Response({"error": "check your request data"}, status=status.HTTP_400_BAD_REQUEST)
+            KeycloakGroupController.assign_group_user(pk, ids)
+            return Response({'id': pk}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_ARRAY,
+            items=openapi.Schema(type=openapi.TYPE_STRING)
+        ),
+        operation_description='将一系列用户从组移除'
+    )
+    @action(detail=True, methods=['delete'], url_path='unassign_users')
+    @check_keycloak_permission('SysGroup_user')
+    def unassigned_group_users(self, request: Request, pk: str):
+        try:
+            ids = request.data
+            if ids is None or not isinstance(ids, list) or len(ids) == 0:
+                return Response({"error": "check your request data"}, status=status.HTTP_400_BAD_REQUEST)
+            KeycloakGroupController.unassigned_group_user(pk, ids)
+            return Response({'id': pk}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @swagger_auto_schema(operation_description='获取该组下的所有角色')
+    @action(detail=True, methods=['get'], url_path='roles')
+    @check_keycloak_permission('SysGroup_role')
+    def get_roles_in_group(self, request: Request, pk: str):
+        try:
+            roles = KeycloakGroupController.get_group_roles(pk)
+            return Response(roles, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_ARRAY,
+            items=openapi.Schema(type=openapi.TYPE_STRING)
+        ),
+        operation_description='将一系列角色添加到组'
+    )
+    @action(detail=True, methods=['patch'], url_path='assign_roles')
+    @check_keycloak_permission('SysGroup_role')
+    def assign_group_roles(self, request: Request, pk: str):
+        try:
+            ids = request.data
+            if ids is None or not isinstance(ids, list) or len(ids) == 0:
+                return Response({"error": "check your request data"}, status=status.HTTP_400_BAD_REQUEST)
+            KeycloakGroupController.assign_group_role(pk, ids)
+            return Response({'id': pk}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_ARRAY,
+            items=openapi.Schema(type=openapi.TYPE_STRING)
+        ),
+        operation_description='将一系列角色从组移除'
+    )
+    @action(detail=True, methods=['delete'], url_path='unassign_roles')
+    @check_keycloak_permission('SysGroup_role')
+    def unassigned_group_roles(self, request: Request, pk: str):
+        try:
+            ids = request.data
+            if ids is None or not isinstance(ids, list) or len(ids) == 0:
+                return Response({"error": "check your request data"}, status=status.HTTP_400_BAD_REQUEST)
+            KeycloakGroupController.unassigned_group_role(pk, ids)
+            return Response({'id': pk}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class UserManageViewSet(ModelViewSet):
@@ -751,7 +1086,6 @@ def generate_validate_code():
 
 
 class LoginInfoView(views.APIView):
-
     authentication_classes = [KeycloakTokenAuthentication]
     permission_classes = [KeycloakIsAuthenticated]
 
@@ -785,14 +1119,14 @@ class LoginInfoView(views.APIView):
         #             pass
         return Response({
             'username': request.user['username'],
-            'id' : request.user['id'],
+            'id': request.user['id'],
             'chname': request.user.get('lastName', ""),
-            'email': request.user['email'],
+            'email': request.user.get('email', ""),
             'token': request.auth,
             'is_super': is_super,
             'menus': menus,
             'operate_ids': operate_ids,
-            'weops_menu':[],
+            'weops_menu': [],
             'applications': [
                 "resource",
                 "big_screen",

@@ -10,35 +10,34 @@ Unless required by applicable law or agreed to in writing, software distributed 
 an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
 specific language governing permissions and limitations under the License.
 """
-from keycloak import KeycloakAdmin
+from keycloak import KeycloakOpenID, KeycloakOpenIDConnection, KeycloakAdmin
 from types import SimpleNamespace
 
 import unittest
-
+import uuid
+import json
 
 class PythonKeycloakTest(unittest.TestCase):
-    # def setUp(self):
-    #     self.username = 'admin'
-    #     self.password = 'admin'
-    #     self.id_of_client = 'a72a5bed-8673-48e1-ac0a-97ba3c06c88f'
-    #     self.keycloak_openid = KeycloakOpenID(
-    #         server_url=f'http://localhost:8080/',
-    #         client_id=f'weops_lite',
-    #         realm_name=f'master',
-    #         client_secret_key=f'UQym8RIjp4X4hxMxIkL1hOktVU1auDa3')
-    #     self.token = self.keycloak_openid.token(self.username, self.password)
-    #
-    #     self.keycloak_connection = KeycloakOpenIDConnection(
-    #         server_url=f'http://localhost:8080/',
-    #         realm_name=f'master',
-    #         client_id=f'weops_lite',
-    #         client_secret_key=f'UQym8RIjp4X4hxMxIkL1hOktVU1auDa3',
-    #         custom_headers={
-    #             "Authorization": f"Bearer {self.token['access_token']}"
-    #         },
-    #         verify=True)
-    #     self.keycloak_admin = KeycloakAdmin(connection=self.keycloak_connection)
-    #     print("Setting up the test environment")
+    def setUp(self):
+        self.username = 'admin'
+        self.password = 'admin'
+        self.id_of_client = 'a72a5bed-8673-48e1-ac0a-97ba3c06c88f'
+        self.keycloak_openid = KeycloakOpenID(
+            server_url=f'http://localhost:8081/',
+            client_id=f'weops_lite',
+            realm_name=f'weops',
+            client_secret_key=f'**********')
+        self.token = self.keycloak_openid.token(self.username, self.password)
+
+        self.keycloak_connection = KeycloakOpenIDConnection(
+            server_url=f'http://localhost:8081/',
+            username=self.username,
+            password=self.password,
+            user_realm_name='master',
+            realm_name=f'weops',
+            client_id=f'admin-cli')
+        self.keycloak_admin = KeycloakAdmin(connection=self.keycloak_connection)
+        print("Setting up the test environment")
 
     def test_method(self):
         userinfo = self.keycloak_openid.userinfo(self.token['access_token'])
@@ -115,12 +114,49 @@ class PythonKeycloakTest(unittest.TestCase):
             self.id_of_client
             , policy_payload)
 
+    def test_get(self):
+        ps = self.keycloak_openid.get_permissions('eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJ3SWktZWRvTktpaU1ZMmR2eU1VcGVTd0tjU1BpeGVqM0JSaEVJZE9sSWhzIn0.eyJleHAiOjE3MDQzNDcyOTIsImlhdCI6MTcwNDI2MDg5MiwianRpIjoiYjgwYThiMmItN2U5NC00ZmU5LTkwZWItNTE4Y2ZlMTQwZTA4IiwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdDo4MDgxL3JlYWxtcy93ZW9wcyIsImF1ZCI6ImFjY291bnQiLCJzdWIiOiI0ZTdiZTc5Ny0yNzBkLTRkOTItOGYyMy04OTIzZWZhODFhMzEiLCJ0eXAiOiJCZWFyZXIiLCJhenAiOiJ3ZW9wc19saXRlIiwic2Vzc2lvbl9zdGF0ZSI6IjVhOGQ4NmZhLWNmMTItNGEyZS1hNTFlLWUxN2ZlY2IxZDhkZiIsImFjciI6IjEiLCJhbGxvd2VkLW9yaWdpbnMiOlsiKiJdLCJyZWFsbV9hY2Nlc3MiOnsicm9sZXMiOlsiZGVmYXVsdC1yb2xlcy1tYXN0ZXIiLCJvZmZsaW5lX2FjY2VzcyIsInVtYV9hdXRob3JpemF0aW9uIl19LCJyZXNvdXJjZV9hY2Nlc3MiOnsiYWNjb3VudCI6eyJyb2xlcyI6WyJtYW5hZ2UtYWNjb3VudCIsIm1hbmFnZS1hY2NvdW50LWxpbmtzIiwidmlldy1wcm9maWxlIl19fSwic2NvcGUiOiJvcGVuaWQgcHJvZmlsZSBlbWFpbCIsInNpZCI6IjVhOGQ4NmZhLWNmMTItNGEyZS1hNTFlLWUxN2ZlY2IxZDhkZiIsImVtYWlsX3ZlcmlmaWVkIjpmYWxzZSwibmFtZSI6IueuoeeQhuWRmCIsInByZWZlcnJlZF91c2VybmFtZSI6ImFkbWluIiwiZmFtaWx5X25hbWUiOiLnrqHnkIblkZgiLCJlbWFpbCI6ImFkbWluQGtjLmNvbSJ9.k0LOl_yyY_PpvUA3LTCmGEEhfrUrsClfB6mBnrN1Igec9XOz_qAG4Cl5YU4zw06pVTpmyyZKc6KPyhYXpcQy6BrseiHYxXKKFdgPu_hVtey_m9oidqUdCHhkaoKgUWnHGHnID6A0--6pb0gOsrgAPLaubzoI8EjO3V866evyXHrr52spLR_1jlg6I1qT35hjjoE8oh4F_gqnAgcMuvNW_-pvI_6fz7UKTi1gco8FQxksZWuPOA7daJjrc5bGgBd6j-Wtudsgq84CM-YQYUT9fwQw2MonCIx85PMrO5qmAuXFXlCuRnzHbs0EEpkfBMslZBCOTm3CkAvh9bo5VF-kLQ')
+        pass
+
     def test_simple_namespace(self):
         obj = SimpleNamespace(name='ddd')
         print(obj.name)
         realms = self.keycloak_admin.get_realms()
         pass
 
+    def test_login_code(self):
+        tk = self.keycloak_openid.token(
+            grant_type='authorization_code',
+            code='eb08fd1e-a50f-4108-a831-6625701a0ee9.da1edc58-e3ce-4e0c-899b-597c7d7c65a7.a72a5bed-8673-48e1-ac0a-97ba3c06c88f',
+            redirect_uri='http://localhost:8000'
+        )
+        pass
+
+    def test_groups(self):
+        g_query = {
+            'search':'555',
+            'first':0,
+            'max':20
+        }
+        groups = self.keycloak_admin.get_groups(g_query)
+        m_query = {
+            'first':0,
+            'max':20
+        }
+        group = self.keycloak_admin.get_group(groups[0]['id'])
+        roles = self.keycloak_admin.get_group_client_roles(groups[0]['id'], self.id_of_client)
+        members = self.keycloak_admin.get_group_members(groups[0]['id'],m_query)
+        # self.keycloak_admin.assign_group_client_roles('fc1c70a8-b159-47e0-97e1-1396433438fc',
+        #                                               'a72a5bed-8673-48e1-ac0a-97ba3c06c88f',
+        #                                               [{
+        #                                                   'name': 'normal',
+        #                                                   'id':'8d1600a5-a785-4d18-a815-44049210968b'
+        #                                               }])
+        # group_payload = {
+        #     'name':'hhg'
+        # }
+        # self.keycloak_admin.create_group()
+        pass
 
 if __name__ == '__main__':
     unittest.main()

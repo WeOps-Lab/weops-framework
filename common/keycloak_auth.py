@@ -3,14 +3,21 @@ from rest_framework.exceptions import AuthenticationFailed
 from django.contrib.auth.models import User
 from django.core.handlers.wsgi import WSGIRequest
 from django.conf import LazySettings
-
 from apps.system_mgmt.utils_package.keycloak_utils import KeycloakUtils
-
+from rest_framework.permissions import BasePermission
+from rest_framework.exceptions import PermissionDenied
 
 settings = LazySettings()
 
+"""
+存放Keycloak身份验证和权限验证的组件
+"""
+
 
 class KeycloakTokenAuthentication(BaseAuthentication):
+    """
+    认证Keycloak token
+    """
 
     def __init__(self):
         self.__keycloak_util = KeycloakUtils()
@@ -19,13 +26,9 @@ class KeycloakTokenAuthentication(BaseAuthentication):
         '''
         该函数返回的信息会被塞到request的属性user和auth中
         '''
-        auth_header: str = request.headers.get('Authorization', None)
-        if not auth_header:
-            raise AuthenticationFailed('Authorization header needed')
-        header_seps = auth_header.split(' ')
-        if len(header_seps) != 2:
-            raise AuthenticationFailed('Authorization header format error')
-        token = header_seps[1]
+        token: str = request.COOKIES.get('token', None)
+        if not token:
+            raise AuthenticationFailed('token cookie is needed')
         return self.authenticate_credentials(token)
 
     def authenticate_credentials(self, token: str):
@@ -36,6 +39,20 @@ class KeycloakTokenAuthentication(BaseAuthentication):
         user['resource_access'] = tokeninfo['resource_access']
         user_obj = User(user['username'], True, user)
         return user_obj, token
+
+
+class KeycloakIsAuthenticated(BasePermission):
+    """
+    权限验证，认证了就可以通过
+    """
+    message = 'Authentication failed.'
+
+    def has_permission(self, request, view):
+        # 如果认证失败，抛出 PermissionDenied 异常
+        if request.user is None:
+            raise PermissionDenied(self.message)
+        # 认证成功
+        return True
 
 
 class User:

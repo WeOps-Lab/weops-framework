@@ -56,7 +56,8 @@ DATABASES = {
 
 INSTALLED_APPS += ("corsheaders",)  # noqa
 # 该跨域中间件需要放在前面
-MIDDLEWARE = ("corsheaders.middleware.CorsMiddleware",) + MIDDLEWARE  # noqa
+MIDDLEWARE = ("corsheaders.middleware.CorsMiddleware",
+              "apps.system_mgmt.utils_package.keycloak_middleware.KeycloakMiddleware") + MIDDLEWARE  # noqa
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOW_CREDENTIALS = True
 

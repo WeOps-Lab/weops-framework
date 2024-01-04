@@ -24,12 +24,14 @@ urlpatterns = [
     url(r"get_is_need_two_factor/$", views.get_is_need_two_factor),
     url(r"login_info/$", views.LoginInfoView.as_view()),
     # 用户登录
-    url(r"keycloak_login/$", views.KeycloakLoginView.as_view()),
+    url(r"keycloak_login/$", views.KeycloakLoginView.as_view(), name='keycloak_login'),
+    url(r"keycloak_code_login/$", views.KeycloakCodeLoginView.as_view(), name='keycloak_code_login'),
 ]
 
 router = DefaultRouter()
 router.register(r'users', views.KeycloakUserViewSet, basename='user')
 router.register(r'roles', views.KeycloakRoleViewSet, basename='role')
 router.register(r'permissions', views.KeycloakPermissionViewSet, basename='permission')
+router.register(r'groups', views.KeycloakGroupViewSet, basename='group')
 # 用户管理API
 urlpatterns.extend(router.urls)
