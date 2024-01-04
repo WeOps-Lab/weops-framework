@@ -2,7 +2,7 @@
   "id": "0c3643d5-fc2e-4173-b5a3-4c36300c6d9b",
   "realm": "weops",
   "displayName": "Keycloak",
-  "displayNameHtml": "<div class=\"kc-logo-text\"><span>Keycloak</span></div>",
+  "displayNameHtml": "<div class=\"kc-logo-text\"><span>WeOps</span></div>",
   "notBefore": 0,
   "defaultSignatureAlgorithm": "RS256",
   "revokeRefreshToken": false,
@@ -347,49 +347,6 @@
       ],
       "weops_lite": [
         {
-          "id": "9f63c4e7-8089-4b3c-90ab-205a5714b857",
-          "name": "new",
-          "description": "1",
-          "composite": false,
-          "clientRole": true,
-          "containerId": "a72a5bed-8673-48e1-ac0a-97ba3c06c88f",
-          "attributes": {
-            "created": [
-              "2023-12-14 17:37:35"
-            ]
-          }
-        },
-        {
-          "id": "354b5b20-aedd-4223-b3a5-443877f17e0b",
-          "name": "角色1",
-          "description": "111",
-          "composite": false,
-          "clientRole": true,
-          "containerId": "a72a5bed-8673-48e1-ac0a-97ba3c06c88f",
-          "attributes": {
-            "created": [
-              "2023-12-21 14:16:47"
-            ]
-          }
-        },
-        {
-          "id": "8d1600a5-a785-4d18-a815-44049210968b",
-          "name": "normal",
-          "description": "本角色为普通用户，需要超级管理员赋予其他权限",
-          "composite": false,
-          "clientRole": true,
-          "containerId": "a72a5bed-8673-48e1-ac0a-97ba3c06c88f",
-          "attributes": {}
-        },
-        {
-          "id": "17d808ba-5009-4226-8183-aef5095108a2",
-          "name": "uma_protection",
-          "composite": false,
-          "clientRole": true,
-          "containerId": "a72a5bed-8673-48e1-ac0a-97ba3c06c88f",
-          "attributes": {}
-        },
-        {
           "id": "85efb45a-a866-43ab-892a-85a6836ab1a7",
           "name": "admin",
           "description": "本角色为超级管理员，有全部的权限",
@@ -398,20 +355,33 @@
           "containerId": "a72a5bed-8673-48e1-ac0a-97ba3c06c88f",
           "attributes": {
             "created": [
-              "2023-1-1"
+              "2023-12-27"
             ]
           }
         },
         {
-          "id": "663a0a44-b602-47e0-93d3-d9a128edf381",
-          "name": "role",
-          "description": "222",
+          "id": "3a02f6b7-bddc-4c52-bad1-7e960921517a",
+          "name": "normal",
+          "description": "",
           "composite": false,
           "clientRole": true,
           "containerId": "a72a5bed-8673-48e1-ac0a-97ba3c06c88f",
           "attributes": {
             "created": [
-              "2023-12-21 17:06:33"
+              "2023-12-27"
+            ]
+          }
+        },
+        {
+          "id": "37055792-f354-4658-aa45-8a26daf1771b",
+          "name": "IA_admin",
+          "description": "本角色为分级管理员，有二次授权权限",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "a72a5bed-8673-48e1-ac0a-97ba3c06c88f",
+          "attributes": {
+            "created": [
+              "2023-12-27"
             ]
           }
         }
@@ -701,111 +671,23 @@
   },
   "groups": [
     {
-      "id": "32705368-5e03-4445-bace-bb4df4cdf740",
-      "name": "1",
-      "path": "/1",
-      "attributes": {},
-      "realmRoles": [],
-      "clientRoles": {
-        "weops_lite": [
-          "new",
-          "admin"
-        ]
-      },
-      "subGroups": [
-        {
-          "id": "9a6356c6-7f57-4aa1-9baa-0f728a22a091",
-          "name": "222",
-          "path": "/1/222",
-          "attributes": {},
-          "realmRoles": [],
-          "clientRoles": {
-            "weops_lite": [
-              "normal",
-              "admin"
-            ]
-          },
-          "subGroups": []
-        }
-      ]
-    },
-    {
-      "id": "602df2a8-fd72-4f5d-bfe1-0834e856f080",
-      "name": "5555改",
-      "path": "/5555改",
-      "attributes": {},
-      "realmRoles": [],
-      "clientRoles": {
-        "weops_lite": [
-          "admin"
-        ]
-      },
-      "subGroups": [
-        {
-          "id": "b2fff293-1cd3-442c-8c24-6089a4c31789",
-          "name": "5子组改",
-          "path": "/5555改/5子组改",
-          "attributes": {},
-          "realmRoles": [],
-          "clientRoles": {},
-          "subGroups": [
-            {
-              "id": "423cfdbe-3752-4386-99e9-ea3a5c1fe383",
-              "name": "孙组1",
-              "path": "/5555改/5子组改/孙组1",
-              "attributes": {},
-              "realmRoles": [],
-              "clientRoles": {},
-              "subGroups": []
-            }
-          ]
-        },
-        {
-          "id": "9a32e175-961f-4e72-b173-f08a307bc836",
-          "name": "子组",
-          "path": "/5555改/子组",
-          "attributes": {},
-          "realmRoles": [],
-          "clientRoles": {},
-          "subGroups": []
-        }
-      ]
-    },
-    {
-      "id": "1a0ed269-dfe0-4cc4-809c-9699992cf459",
-      "name": "test2组织",
-      "path": "/test2组织",
+      "id": "a7847105-df3d-4ba8-a057-dedc9bb91c4c",
+      "name": "Test Group",
+      "path": "/Test Group",
       "attributes": {},
       "realmRoles": [],
       "clientRoles": {},
-      "subGroups": []
-    },
-    {
-      "id": "f385b241-6fb1-4816-9a78-783016343d90",
-      "name": "test组织",
-      "path": "/test组织",
-      "attributes": {},
-      "realmRoles": [],
-      "clientRoles": {
-        "weops_lite": [
-          "new",
-          "角色1"
-        ]
-      },
-      "subGroups": []
-    },
-    {
-      "id": "80f9d8c3-0cea-4793-a7c7-da0010437c58",
-      "name": "演示",
-      "path": "/演示",
-      "attributes": {},
-      "realmRoles": [],
-      "clientRoles": {
-        "weops_lite": [
-          "role"
-        ]
-      },
-      "subGroups": []
+      "subGroups": [
+        {
+          "id": "0095ff1f-d562-4d5f-bad2-1d92bf884502",
+          "name": "Sub Group",
+          "path": "/Test Group/Sub Group",
+          "attributes": {},
+          "realmRoles": [],
+          "clientRoles": {},
+          "subGroups": []
+        }
+      ]
     }
   ],
   "defaultRole": {
@@ -828,8 +710,8 @@
   "otpPolicyCodeReusable": false,
   "otpSupportedApplications": [
     "totpAppMicrosoftAuthenticatorName",
-    "totpAppGoogleName",
-    "totpAppFreeOTPName"
+    "totpAppFreeOTPName",
+    "totpAppGoogleName"
   ],
   "webAuthnPolicyRpEntityName": "keycloak",
   "webAuthnPolicySignatureAlgorithms": [
@@ -869,11 +751,6 @@
       "realmRoles": [
         "default-roles-master"
       ],
-      "clientRoles": {
-        "weops_lite": [
-          "uma_protection"
-        ]
-      },
       "notBefore": 0,
       "groups": []
     }
@@ -1240,7 +1117,7 @@
         "*"
       ],
       "webOrigins": [
-        "/*"
+        "*"
       ],
       "notBefore": 0,
       "bearerOnly": false,
@@ -1257,7 +1134,7 @@
         "oidc.ciba.grant.enabled": "false",
         "client.secret.creation.time": "1700294947",
         "backchannel.logout.session.required": "true",
-        "login_theme": "keycloak",
+        "login_theme": "my_custom_theme",
         "post.logout.redirect.uris": "*",
         "oauth2.device.authorization.grant.enabled": "false",
         "display.on.consent.screen": "false",
@@ -1489,20 +1366,69 @@
             "_id": "2cfa50b0-1407-4ef3-8e4d-26f1dbc5c1ae",
             "uris": [],
             "icon_uri": ""
+          },
+          {
+            "name": "SysGroup_view",
+            "type": "group",
+            "ownerManagedAccess": false,
+            "displayName": "查询组织",
+            "attributes": {},
+            "_id": "82a1fd33-379e-48ea-9696-f2126a117823",
+            "uris": [],
+            "icon_uri": ""
+          },
+          {
+            "name": "SysGroup_create",
+            "type": "group",
+            "ownerManagedAccess": false,
+            "displayName": "创建组织",
+            "attributes": {},
+            "_id": "93002144-ba11-4827-847d-b7f0a817ceb5",
+            "uris": [],
+            "icon_uri": ""
+          },
+          {
+            "name": "SysGroup_edit",
+            "type": "group",
+            "ownerManagedAccess": false,
+            "displayName": "编辑组织",
+            "attributes": {},
+            "_id": "00db6554-3bbb-4e60-b21d-8949539a3680",
+            "uris": [],
+            "icon_uri": ""
+          },
+          {
+            "name": "SysGroup_user",
+            "type": "group",
+            "ownerManagedAccess": false,
+            "displayName": "组织人员管理",
+            "attributes": {},
+            "_id": "6526174a-606b-4f94-844f-ec6a837b45c1",
+            "uris": [],
+            "icon_uri": ""
+          },
+          {
+            "name": "SysGroup_role",
+            "type": "group",
+            "ownerManagedAccess": false,
+            "displayName": "组织角色管理",
+            "attributes": {},
+            "_id": "1118077e-6294-45bb-8dcf-0718ed0e24e9",
+            "uris": [],
+            "icon_uri": ""
+          },
+          {
+            "name": "SysGroup_delete",
+            "type": "group",
+            "ownerManagedAccess": false,
+            "displayName": "组织删除",
+            "attributes": {},
+            "_id": "78e35a40-5415-40f4-8f83-ad2489384885",
+            "uris": [],
+            "icon_uri": ""
           }
         ],
         "policies": [
-          {
-            "id": "3a67face-d00b-4398-b7ab-78465abfb6df",
-            "name": "normal",
-            "description": "",
-            "type": "role",
-            "logic": "POSITIVE",
-            "decisionStrategy": "UNANIMOUS",
-            "config": {
-              "roles": "[{\"id\":\"weops_lite/normal\",\"required\":true}]"
-            }
-          },
           {
             "id": "2d1c2180-02d8-45f7-a575-12abe5d59b08",
             "name": "admin",
@@ -1515,33 +1441,25 @@
             }
           },
           {
-            "id": "59c742f6-70a2-4071-83b6-2e19c11ad603",
-            "name": "new",
+            "id": "6fb0671d-b6eb-499e-ba08-f06c5164e4d2",
+            "name": "IA_admin",
+            "description": "",
             "type": "role",
             "logic": "POSITIVE",
             "decisionStrategy": "UNANIMOUS",
             "config": {
-              "roles": "[{\"id\":\"weops_lite/new\",\"required\":true}]"
+              "roles": "[{\"id\":\"weops_lite/IA_admin\",\"required\":true}]"
             }
           },
           {
-            "id": "92d1942f-e511-40bc-aefd-58f4e8a4533d",
-            "name": "角色1",
+            "id": "41e8d3ce-36eb-46af-8110-75c539b792cc",
+            "name": "normal",
+            "description": "",
             "type": "role",
             "logic": "POSITIVE",
             "decisionStrategy": "UNANIMOUS",
             "config": {
-              "roles": "[{\"id\":\"weops_lite/角色1\",\"required\":true}]"
-            }
-          },
-          {
-            "id": "b81be78c-4cf9-4ee7-8b01-57a5573c7430",
-            "name": "role",
-            "type": "role",
-            "logic": "POSITIVE",
-            "decisionStrategy": "UNANIMOUS",
-            "config": {
-              "roles": "[{\"id\":\"weops_lite/role\",\"required\":true}]"
+              "roles": "[{\"id\":\"weops_lite/normal\",\"required\":true}]"
             }
           },
           {
@@ -1553,7 +1471,7 @@
             "decisionStrategy": "AFFIRMATIVE",
             "config": {
               "resources": "[\"SysUser_view\"]",
-              "applyPolicies": "[\"role\",\"new\",\"normal\",\"admin\"]"
+              "applyPolicies": "[\"normal\",\"admin\"]"
             }
           },
           {
@@ -1565,7 +1483,7 @@
             "decisionStrategy": "AFFIRMATIVE",
             "config": {
               "resources": "[\"SysLog_view\"]",
-              "applyPolicies": "[\"role\",\"new\",\"normal\",\"admin\"]"
+              "applyPolicies": "[\"normal\",\"admin\"]"
             }
           },
           {
@@ -1577,7 +1495,7 @@
             "decisionStrategy": "AFFIRMATIVE",
             "config": {
               "resources": "[\"SysRole_create\"]",
-              "applyPolicies": "[\"admin\"]"
+              "applyPolicies": "[\"IA_admin\",\"admin\"]"
             }
           },
           {
@@ -1589,7 +1507,7 @@
             "decisionStrategy": "AFFIRMATIVE",
             "config": {
               "resources": "[\"SysRole_delete\"]",
-              "applyPolicies": "[\"admin\"]"
+              "applyPolicies": "[\"IA_admin\",\"admin\"]"
             }
           },
           {
@@ -1601,7 +1519,7 @@
             "decisionStrategy": "AFFIRMATIVE",
             "config": {
               "resources": "[\"SysRole_edit\"]",
-              "applyPolicies": "[\"admin\"]"
+              "applyPolicies": "[\"IA_admin\",\"admin\"]"
             }
           },
           {
@@ -1613,7 +1531,7 @@
             "decisionStrategy": "AFFIRMATIVE",
             "config": {
               "resources": "[\"SysRole_permissions\"]",
-              "applyPolicies": "[\"admin\"]"
+              "applyPolicies": "[\"IA_admin\",\"admin\"]"
             }
           },
           {
@@ -1625,7 +1543,7 @@
             "decisionStrategy": "AFFIRMATIVE",
             "config": {
               "resources": "[\"SysRole_users_manage\"]",
-              "applyPolicies": "[\"admin\"]"
+              "applyPolicies": "[\"IA_admin\",\"admin\"]"
             }
           },
           {
@@ -1637,7 +1555,7 @@
             "decisionStrategy": "AFFIRMATIVE",
             "config": {
               "resources": "[\"SysRole_view\"]",
-              "applyPolicies": "[\"role\",\"new\",\"normal\",\"admin\"]"
+              "applyPolicies": "[\"IA_admin\",\"normal\",\"admin\"]"
             }
           },
           {
@@ -1697,7 +1615,7 @@
             "decisionStrategy": "AFFIRMATIVE",
             "config": {
               "resources": "[\"SysSetting_menus_view\"]",
-              "applyPolicies": "[\"new\",\"normal\",\"admin\"]"
+              "applyPolicies": "[\"normal\",\"admin\"]"
             }
           },
           {
@@ -1709,7 +1627,7 @@
             "decisionStrategy": "AFFIRMATIVE",
             "config": {
               "resources": "[\"SysUser_create\"]",
-              "applyPolicies": "[\"role\",\"new\",\"admin\"]"
+              "applyPolicies": "[\"admin\"]"
             }
           },
           {
@@ -1721,7 +1639,7 @@
             "decisionStrategy": "AFFIRMATIVE",
             "config": {
               "resources": "[\"SysUser_delete\"]",
-              "applyPolicies": "[\"role\",\"admin\"]"
+              "applyPolicies": "[\"admin\"]"
             }
           },
           {
@@ -1733,7 +1651,79 @@
             "decisionStrategy": "AFFIRMATIVE",
             "config": {
               "resources": "[\"SysUser_edit\"]",
-              "applyPolicies": "[\"role\",\"admin\"]"
+              "applyPolicies": "[\"admin\"]"
+            }
+          },
+          {
+            "id": "4ae83150-1999-459f-a09e-e05a83fdc8f4",
+            "name": "SysGroup_view",
+            "description": "",
+            "type": "resource",
+            "logic": "POSITIVE",
+            "decisionStrategy": "AFFIRMATIVE",
+            "config": {
+              "resources": "[\"SysGroup_view\"]",
+              "applyPolicies": "[\"normal\",\"admin\"]"
+            }
+          },
+          {
+            "id": "dc1d9f4d-4a1d-4802-b905-2e342f7de125",
+            "name": "SysGroup_user",
+            "description": "",
+            "type": "resource",
+            "logic": "POSITIVE",
+            "decisionStrategy": "AFFIRMATIVE",
+            "config": {
+              "resources": "[\"SysGroup_user\"]",
+              "applyPolicies": "[\"admin\"]"
+            }
+          },
+          {
+            "id": "92559580-f0ca-4f07-a3e2-b69566258445",
+            "name": "SysGroup_role",
+            "description": "",
+            "type": "resource",
+            "logic": "POSITIVE",
+            "decisionStrategy": "AFFIRMATIVE",
+            "config": {
+              "resources": "[\"SysGroup_role\"]",
+              "applyPolicies": "[\"admin\"]"
+            }
+          },
+          {
+            "id": "14ea643a-8290-464d-a848-804b86d4b10b",
+            "name": "SysGroup_edit",
+            "description": "",
+            "type": "resource",
+            "logic": "POSITIVE",
+            "decisionStrategy": "AFFIRMATIVE",
+            "config": {
+              "resources": "[\"SysGroup_edit\"]",
+              "applyPolicies": "[\"admin\"]"
+            }
+          },
+          {
+            "id": "7f4863a4-1d1a-4a88-9f4e-fad62e7a51d0",
+            "name": "SysGroup_delete",
+            "description": "",
+            "type": "resource",
+            "logic": "POSITIVE",
+            "decisionStrategy": "AFFIRMATIVE",
+            "config": {
+              "resources": "[\"SysGroup_delete\"]",
+              "applyPolicies": "[\"admin\"]"
+            }
+          },
+          {
+            "id": "1347c4af-44b7-4f73-8954-1cc3e8ceb474",
+            "name": "SysGroup_create",
+            "description": "",
+            "type": "resource",
+            "logic": "POSITIVE",
+            "decisionStrategy": "AFFIRMATIVE",
+            "config": {
+              "resources": "[\"SysGroup_create\"]",
+              "applyPolicies": "[\"admin\"]"
             }
           }
         ],
@@ -2277,7 +2267,7 @@
     "strictTransportSecurity": "max-age=31536000; includeSubDomains"
   },
   "smtpServer": {},
-  "loginTheme": "keycloak",
+  "loginTheme": "base",
   "accountTheme": "keycloak.v2",
   "adminTheme": "keycloak.v2",
   "emailTheme": "keycloak",
