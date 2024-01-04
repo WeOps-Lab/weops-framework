@@ -74,5 +74,5 @@ PyYAML==6.0
 wrapt==1.14.1
 django-versionlog==1.6.0
 opentelemetry-distro==0.33b0
-
+drf-yasg==1.17.0
 wheel==0.37.0
