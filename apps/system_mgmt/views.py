@@ -416,6 +416,7 @@ class KeycloakLoginView(views.APIView):
             res.set_cookie('token', token)
             return res
 
+
 class KeycloakCodeLoginView(views.APIView):
     '''
     该类用作验证登录
@@ -429,7 +430,7 @@ class KeycloakCodeLoginView(views.APIView):
         ],
         operation_description='用作登录后的重定向，根据请求的code获取token，获取完回到主页'
     )
-    def get(self, request: Request) :
+    def get(self, request: Request):
         # 从请求中获取code
         code = request.query_params.get('code', None)
         if code is None:
@@ -446,6 +447,7 @@ class KeycloakCodeLoginView(views.APIView):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_401_UNAUTHORIZED)
 
+
 class KeycloakUserViewSet(viewsets.ViewSet):
     authentication_classes = [KeycloakTokenAuthentication]
     permission_classes = [KeycloakIsAuthenticated]
@@ -455,14 +457,24 @@ class KeycloakUserViewSet(viewsets.ViewSet):
             openapi.Parameter('page', in_=openapi.IN_QUERY, type=openapi.TYPE_INTEGER),
             openapi.Parameter('per_page', in_=openapi.IN_QUERY, type=openapi.TYPE_INTEGER),
             openapi.Parameter('search', in_=openapi.IN_QUERY, type=openapi.TYPE_STRING),
+            openapi.Parameter('roles', in_=openapi.IN_QUERY, type=openapi.TYPE_ARRAY, items=openapi.TYPE_STRING),
         ]
     )
     @check_keycloak_permission('SysUser_view')
     def list(self, request: Request):
         page = request.query_params.get("page", 1)  # 获取请求中的页码参数，默认为第一页
         per_page = request.query_params.get("per_page", 10)  # 获取请求中的每页结果数，默认为10
-        res = KeycloakUserController.get_user_list(**{"page": int(page), "per_page": int(per_page)
-            , "search": request.query_params.get('search', None)})
+        roles = []
+        try:
+            roles_p = request.query_params.get('roles', None)
+            if roles_p:
+                roles = eval(roles_p)
+        except Exception as e:
+            return Response({'error': 'roles format error'}, status=status.HTTP_400_BAD_REQUEST)
+        res = KeycloakUserController.get_user_list(**{"page": int(page),
+                                                      "per_page": int(per_page),
+                                                      "search": request.query_params.get('search', None),
+                                                      'role_ids': roles})
         return Response(res)
 
     @swagger_auto_schema(
@@ -743,6 +755,42 @@ class KeycloakRoleViewSet(viewsets.ViewSet):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         return Response({'id': pk}, status=status.HTTP_200_OK)
+
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_ARRAY,
+            items=openapi.Schema(type=openapi.TYPE_STRING)
+        ),
+        operation_description='将该角色添加到一系列组中'
+    )
+    @action(detail=True, methods=['patch'], url_path='assign_groups')
+    def assign_groups(self, request: Request, pk: str):
+        try:
+            ids = request.data
+            if ids is None or not isinstance(ids, list) or len(ids) == 0:
+                return Response({"error": "check your request data"}, status=status.HTTP_400_BAD_REQUEST)
+            KeycloakRoleController.assign_role_groups(pk, ids)
+            return Response({'id': pk}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_ARRAY,
+            items=openapi.Schema(type=openapi.TYPE_STRING)
+        ),
+        operation_description='将该角色从一系列组中移除'
+    )
+    @action(detail=True, methods=['delete'], url_path='unassign_groups')
+    def unassign_groups(self, request: Request, pk: str):
+        try:
+            ids = request.data
+            if ids is None or not isinstance(ids, list) or len(ids) == 0:
+                return Response({"error": "check your request data"}, status=status.HTTP_400_BAD_REQUEST)
+            KeycloakRoleController.unassign_role_groups(pk, ids)
+            return Response({'id': pk}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class KeycloakPermissionViewSet(viewsets.ViewSet):

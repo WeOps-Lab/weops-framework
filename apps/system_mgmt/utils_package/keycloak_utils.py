@@ -40,10 +40,6 @@ class KeycloakUtils:
         # self.__refresh_keycloak_admin__()
         # 获取权限配置文件
         auth_json = self.__keycloak_admin.get_client_authz_settings(self.__settings.KEYCLOAK_SETTINGS["ID_OF_CLIENT"])
-        # # 为没有applyPolicies的添加一个空列表，否则会报错
-        # for p in auth_json['policies']:
-        #     if p['config'].get('applyPolicies', None) is None:
-        #         p['config']['applyPolicies'] = '[]'
         json_str = json.dumps(auth_json)
         with tempfile.NamedTemporaryFile(mode='w+', delete=False) as temp_file:
             temp_file.write(json_str)
@@ -99,11 +95,6 @@ class KeycloakUtils:
         获取keycloak_admin
         如果失效了重新获取
         '''
-        # try:
-        #     if not self.__keycloak_openid.introspect(self.__admin_token).get('active', False):
-        #         raise Exception('invalid admin token')
-        # except Exception as e:
-        #     self.__refresh_keycloak_admin__()
         return self.__keycloak_admin
 
     def update_permission(self, permission_id: str, payload: dict):

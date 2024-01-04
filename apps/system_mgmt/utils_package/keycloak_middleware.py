@@ -25,14 +25,14 @@ class KeycloakMiddleware:
         if not self._is_public_url(request.path_info) and not self._is_authenticated(request):
             # 重定向到 Keycloak 登录页 redirect_uri 填获取根据code获取token的接口
             return redirect(
-                f'http://{request.get_host().split(":")[0]}:{self._settings.KEYCLOAK_SETTINGS["PORT"]}/realms/{self._settings.KEYCLOAK_SETTINGS["REALM_NAME"]}'
-                #             f'http://dev.weops.com:8081/realms/{self._settings.KEYCLOAK_SETTINGS["REALM_NAME"]}'
+                # f'http://{request.get_host().split(":")[0]}:{self._settings.KEYCLOAK_SETTINGS["PORT"]}/realms/{self._settings.KEYCLOAK_SETTINGS["REALM_NAME"]}'
+                            f'http://appdev.weops.com:8081/realms/{self._settings.KEYCLOAK_SETTINGS["REALM_NAME"]}'
                             f'/protocol/openid-connect/auth'
                             f'?client_id={self._settings.KEYCLOAK_SETTINGS["CLIENT_ID"]}'
                             f'&response_type=code'
                             f'&scope=openid'
-                            f'&redirect_uri={request.build_absolute_uri(reverse("keycloak_code_login"))}'
-                            # f'&redirect_uri=http://dev.weops.com:8081{reverse("keycloak_code_login")}'
+                            # f'&redirect_uri={request.build_absolute_uri(reverse("keycloak_code_login"))}'
+                            f'&redirect_uri=http://appdev.weops.com:8081{reverse("keycloak_code_login")}'
             )
 
         response = self.get_response(request)
@@ -51,5 +51,5 @@ class KeycloakMiddleware:
 
     def _is_public_url(self, path_info):
         # 检查是否是公开的URL，不需要登录的URL
-        public_urls = [reverse("keycloak_login"), reverse("keycloak_code_login")]
+        public_urls = [reverse("keycloak_login"), reverse("keycloak_code_login"), '/swagger', '/static']
         return any(path_info.startswith(url) for url in public_urls)
