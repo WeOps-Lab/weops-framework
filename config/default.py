@@ -41,6 +41,7 @@ INSTALLED_APPS += (  # noqa
     "rest_framework",
     "rest_framework_swagger",
     "base_index",
+    'drf_yasg',
 )
 
 # 这里是默认的中间件，大部分情况下，不需要改动
