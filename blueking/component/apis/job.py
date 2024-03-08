@@ -191,3 +191,9 @@ class CollectionsJOB(object):
             path="/api/c/compapi{bk_api_ver}/jobv3/operate_job_instance/",
             description=u"用于对执行的作业实例进行操作，例如终止作业。",
         )
+        self.get_account_list = ComponentAPI(
+            client=self.client,
+            method="GET",
+            path="/api/c/compapi/v2/jobv3/get_account_list/",
+            description=u"查询作业平台账户列表",
+        )
